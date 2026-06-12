@@ -1,14 +1,73 @@
-# A fast, small, safe, gradually typed embeddable scripting language derived from Lua
-#
-# https://github.com/luau-lang/luau
-# https://luau.org/
+# Project place file
+*.rbxlx
+*.rbxm
 
-# Code coverage
-coverage.out
+# Roblox Studio lock files
+/*.rbxlx.lock
+/*.rbxl.lock
 
-# Profiling
-profile.out
-profile.svg
+# Compiled Lua sources
+luac.out
 
-# Time trace
-trace.json
+# luarocks build files
+*.src.rock
+*.zip
+*.tar.gz
+
+# Object files
+*.o
+*.os
+*.ko
+*.obj
+*.elf
+
+# Precompiled Headers
+*.gch
+*.pch
+
+# Libraries
+*.lib
+*.a
+*.la
+*.lo
+*.def
+*.exp
+
+# Shared objects (inc. Windows DLLs)
+*.dll
+*.so
+*.so.*
+*.dylib
+
+# Executables
+*.exe
+*.out
+*.app
+*.i*86
+*.x86_64
+*.hex
+
+# 忽略 Wally 安装的包目录
+Packages/
+
+# 忽略 Aftman 本地安装目录（可选，若使用 Aftman）
+.aftman/
+
+# 忽略 Roblox Studio 自动生成的文件
+*.model.rbxl
+*.place.rbxlx
+
+# Excel 源文件（避免冲突和二进制文件膨胀）
+GameConfig.xlsx
+*.xlsx
+*.xls
+
+# 但保留一个空模板（可选）
+!GameConfig.template.xlsx
+
+# Python 缓存
+__pycache__/
+*.pyc
+# 虚拟环境
+.venv/
+venv/
