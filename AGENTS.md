@@ -33,3 +33,35 @@
 
 - 表格分隔符行必须使用空格对齐风格：`| --- | ----- | ------ |`
 - 所有 Markdown 表格的每列内容前后都应有空格（与分隔符风格一致）
+
+## 文档体系
+
+- `docs/game-design.md` — 游戏设计文档（玩法、机制、数值）
+- `docs/architecture.md` — 技术架构文档（Knit 服务/控制器设计）
+- `docs/api-reference.md` — API 参考文档（模块接口定义）
+- `docs/changelog.md` — 变更日志
+
+## 当前项目状态
+
+### 已完成（Studio 实例）
+- 半足球场布局（Workspace.Field_1）含禁区线、中圈、球门
+- 24 位球星 NPC（R15 骨骼，放置在场上各处）
+- 45 个足球模型（ServerStorage.Ball）含 ProximityPrompt、Highlights、Trail、音效
+- 44 个球门模型（ServerStorage.Goal）含 goal_chk 进球检测器
+- Knit 框架基础入口（init.server.luau + init.client.luau）
+
+### 待开发（src/ 代码）
+- services/ 目录为空 — 需要新建 BallService、GoalService、RewardService、PlayerService
+- controllers/ 目录为空 — 需要新建 UIController、InputController、CameraController
+- shared/types/ 为空 — 需要定义 BallTypes、GoalTypes、PlayerTypes
+- shared/constants/ 为空 — 需要定义事件名、常量
+- shared/configs/ 为空 — 需要数据配置
+- DataStore 尚未接入 — 需要金币持久化逻辑
+
+## 工作流说明
+
+因项目采用 Studio + Rojo 混合模式：
+- Studio 中已存在的实例（球场、模型、NPC）**不应在 src/ 中重复创建**
+- src/ 只编写 ServerScriptService / StarterPlayerScripts 下的逻辑脚本
+- 修改 default.project.json 后必须重启 `rojo serve`
+- Studio 中手动创建的 UI 界面通过 MCP 工具调用，Knit Controller 负责事件绑定
