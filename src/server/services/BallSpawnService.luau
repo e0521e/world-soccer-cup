@@ -38,6 +38,12 @@ local BallSpawnService = Knit.CreateService({
             return
         end
 
+        ball.PrimaryPart = mainPart
+        mainPart.Anchored = true
+        mainPart.CanCollide = false
+
+        ball.Parent = workspace
+
         local centerZ = field:GetAttribute("CenterZ") or 0
         local centerX = field:GetAttribute("CenterX") or 0
         local mirrored = field:GetAttribute("Mirrored") or false
@@ -46,11 +52,7 @@ local BallSpawnService = Knit.CreateService({
         local penaltyZ = centerZ - 25 + math.random() * 50
         local dropPos = Vector3.new(penaltyX, Constants.BALL_SPAWN_DROP_HEIGHT, penaltyZ)
 
-        mainPart.Position = dropPos
-        mainPart.Anchored = true
-        mainPart.CanCollide = false
-
-        ball.Parent = workspace
+        ball:PivotTo(CFrame.new(dropPos))
 
         local highlight = ball:FindFirstChildWhichIsA("Highlight")
         if highlight then
@@ -64,7 +66,6 @@ local BallSpawnService = Knit.CreateService({
             spawnTime = tick(),
             dropPos = dropPos,
         }
-
         self.Client.OnBallSpawned:FireAll(dropPos, mainPart.Size)
 
         task.spawn(function()
@@ -76,7 +77,7 @@ local BallSpawnService = Knit.CreateService({
         local ballData = self._activeBalls[ball]
         if not ballData then return end
 
-        local startY = mainPart.Position.Y
+        local startPos = ball:GetPivot()
         local targetPos = Vector3.new(mainPart.Position.X, Constants.BALL_LAND_Y, mainPart.Position.Z)
         local dropDuration = 1.5
         local startTime = tick()
@@ -85,12 +86,12 @@ local BallSpawnService = Knit.CreateService({
             local elapsed = tick() - startTime
             local t = math.min(elapsed / dropDuration, 1)
             local eased = t < 0.5 and 2 * t * t or -1 + (4 - 2 * t) * t
-            local currentY = startY + (targetPos.Y - startY) * eased
-
-            mainPart.Position = Vector3.new(mainPart.Position.X, currentY, mainPart.Position.Z)
+            local currentY = startPos.Y + (targetPos.Y - startPos.Y) * eased
+            local currentPos = Vector3.new(mainPart.Position.X, currentY, mainPart.Position.Z)
+            ball:PivotTo(CFrame.new(currentPos) * startPos.Rotation)
 
             if t >= 1 then
-                mainPart.Position = targetPos
+                ball:PivotTo(CFrame.new(targetPos) * startPos.Rotation)
                 break
             end
 
@@ -100,7 +101,6 @@ local BallSpawnService = Knit.CreateService({
 
         if not self._activeBalls[ball] or ballData.inUse then return end
 
-        mainPart.Anchored = true
         ballData.landPos = targetPos
 
         self.Client.OnBallLanded:FireAll(mainPart.Position, ball.Name)
@@ -150,7 +150,7 @@ local BallSpawnService = Knit.CreateService({
             track:Play()
         end
 
-        task.wait(0.3)
+        task.wait(Constants.KICK_ANIM_TO_FLIGHT_DELAY)
         if rootPart then
             humanoid.AutoRotate = true
         end

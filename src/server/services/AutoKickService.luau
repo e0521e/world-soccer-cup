@@ -112,7 +112,7 @@ local AutoKickService = Knit.CreateService({
             animTrack:Play()
         end
 
-        task.wait(0.5)
+        task.wait(Constants.KICK_ANIM_TO_FLIGHT_DELAY)
         if ball then
             self:_FlyBallToGoal(player, ball, slotData)
         end

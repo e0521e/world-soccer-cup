@@ -154,17 +154,36 @@ local NPCTimerService = Knit.CreateService({
         local positions = self._slotPositions[player] or {}
         local pos = positions[slotData.slotId]
         if not pos then return end
-        local primary = npcModel:FindFirstChild("HumanoidRootPart")
-        if primary then
+        local ox = (math.random() - 0.5) * 6
+        local oz = (math.random() - 0.5) * 6
+        local targetPos = Vector3.new(pos.X + ox, pos.Y + 2.5, pos.Z + oz)
+        local dropHeight = 50
+        local dropDuration = 1.5
+        local targetRot = CFrame.Angles(0, math.rad(90), 0)
+        local dropStart = targetPos + Vector3.new(0, dropHeight, 0)
+
+        npcModel:PivotTo(CFrame.new(dropStart) * targetRot)
+
+        task.spawn(function()
+            local startTime = tick()
+            while true do
+                local elapsed = tick() - startTime
+                local t = math.min(elapsed / dropDuration, 1)
+                local eased = t * t
+                local currentY = dropStart.Y + (targetPos.Y - dropStart.Y) * eased
+                npcModel:PivotTo(CFrame.new(Vector3.new(targetPos.X, currentY, targetPos.Z)) * targetRot)
+                if t >= 1 then
+                    npcModel:PivotTo(CFrame.new(targetPos) * targetRot)
+                    break
+                end
+                task.wait()
+            end
             for _, part in ipairs(npcModel:GetDescendants()) do
                 if part:IsA("BasePart") then
                     part.Anchored = false
                 end
             end
-            local ox = (math.random() - 0.5) * 6
-            local oz = (math.random() - 0.5) * 6
-            primary.CFrame = CFrame.new(pos.X + ox, pos.Y + 2.5, pos.Z + oz) * CFrame.Angles(0, math.rad(90), 0)
-        end
+        end)
         if humanoid then
             humanoid.WalkSpeed = 0
         end
@@ -174,7 +193,7 @@ local NPCTimerService = Knit.CreateService({
         gui.Size = UDim2.new(0, 100, 0, 40)
         gui.StudsOffset = Vector3.new(0, 8, 0)
         gui.AlwaysOnTop = true
-        gui.Parent = primary or npcModel
+		gui.Parent = npcModel:FindFirstChild("HumanoidRootPart") or npcModel
 
         local label = Instance.new("TextLabel")
         label.Name = "TimerLabel"

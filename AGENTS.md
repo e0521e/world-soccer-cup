@@ -44,6 +44,7 @@
 ## 当前项目状态
 
 ### 已完成（Studio 实例）
+
 - 半足球场布局（Workspace.Field_1）含禁区线、中圈、球门
 - 24 位球星 NPC（R15 骨骼，放置在场上各处）
 - 45 个足球模型（ServerStorage.Ball）含 ProximityPrompt、Highlights、Trail、音效
@@ -51,6 +52,7 @@
 - Knit 框架基础入口（init.server.luau + init.client.luau）
 
 ### 待开发（src/ 代码）
+
 - services/ 目录为空 — 需要新建 BallService、GoalService、RewardService、PlayerService
 - controllers/ 目录为空 — 需要新建 UIController、InputController、CameraController
 - shared/types/ 为空 — 需要定义 BallTypes、GoalTypes、PlayerTypes
@@ -61,6 +63,7 @@
 ## 工作流说明
 
 因项目采用 Studio + Rojo 混合模式：
+
 - Studio 中已存在的实例（球场、模型、NPC）**不应在 src/ 中重复创建**
 - src/ 只编写 ServerScriptService / StarterPlayerScripts 下的逻辑脚本
 - 修改 default.project.json 后必须重启 `rojo serve`
