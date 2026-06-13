@@ -42,6 +42,7 @@ local RewardService = Knit.CreateService({
 
     _playerData = {},
     _dataStore = nil,
+    _lastSave = {},
 
     GetCoins = function(self, player)
         local data = self._playerData[player]
@@ -192,10 +193,15 @@ local RewardService = Knit.CreateService({
         end
     end,
 
-    _SaveData = function(self, player)
+    _SaveData = function(self, player, force)
         if not self._dataStore then return end
         local data = self._playerData[player]
         if not data then return end
+
+        local now = tick()
+        local last = self._lastSave[player] or 0
+        if not force and (now - last) < 15 then return end
+        self._lastSave[player] = now
 
         local userId = player.UserId
         local key = Constants.DATASTORE_KEY .. tostring(userId)
@@ -209,8 +215,9 @@ local RewardService = Knit.CreateService({
     end,
 
     OnPlayerRemoving = function(self, player)
-        self:_SaveData(player)
+        self:_SaveData(player, true)
         self._playerData[player] = nil
+        self._lastSave[player] = nil
     end,
 
     KnitInit = function(self)

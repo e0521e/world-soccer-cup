@@ -4,7 +4,7 @@ local Knit = require(game:GetService("ReplicatedStorage").Packages.Knit)
 local Players = game:GetService("Players")
 local TweenService = game:GetService("TweenService")
 
-local MAX_MINUTES = 10
+local MAX_MINUTES = 5
 local DOT_SIZE = 12
 local DOT_VIBRATE_SCALE = 1.3
 
@@ -21,6 +21,7 @@ local UIController = Knit.CreateController({
 	_dots = nil,
 	_unlockLabel = nil,
 	_teamDone = false,
+	_lastLevel = 1,
 
 	KnitStart = function(self)
 		self._reward = Knit.GetService("RewardService")
@@ -45,6 +46,11 @@ local UIController = Knit.CreateController({
 	playerSvc.OnRespawnQualityUp:Connect(function() end)
 	self._reward.OnNPCQualityUp:Connect(function() end)
 	self._reward.OnNPCUnlocked:Connect(function() end)
+	self._reward.OnCoinsChanged:Connect(function() end)
+	self._reward.OnLevelUp:Connect(function() end)
+	self._npcProgress.OnMinuteReached:Connect(function() end)
+	self._npcProgress.OnTeamComplete:Connect(function() end)
+	self._npcProgress.OnTimeTick:Connect(function() end)
 
 	-- Poll elapsed time every 1s instead of signal (signals not reaching client)
 		task.spawn(function()
@@ -52,29 +58,24 @@ local UIController = Knit.CreateController({
 				task.wait(1)
 				local totalSeconds = self._npcProgress:GetElapsedTime()
 				self:_UpdateTimeDisplay(totalSeconds)
-				if totalSeconds >= 600 and not self._teamDone then
+				local coins = self._reward:GetCoins()
+				self:_UpdateCoins(coins, 0)
+				local levelInfo = self._reward:GetLevel()
+				if levelInfo and self._lastLevel ~= levelInfo.level then
+					self._lastLevel = levelInfo.level
+					self:_UpdateLevel(levelInfo.level, levelInfo.multiplier)
+				end
+				if totalSeconds >= 300 and not self._teamDone then
 					self._teamDone = true
 					self:_ShowTeamComplete()
 				end
 			end
 		end)
 
-		self._reward.OnCoinsChanged:Connect(function(player, newBalance, delta)
+		self._autoKick.OnGoalScored:Connect(function(player, slotId, npcId)
 			if player ~= Players.LocalPlayer then return end
-			self:_UpdateCoins(newBalance, delta)
+			self:_ShowGoalEffect()
 		end)
-
-		self._reward.OnLevelUp:Connect(function(player, newLevel, multiplier)
-			if player ~= Players.LocalPlayer then return end
-			self:_UpdateLevel(newLevel, multiplier)
-		end)
-
-		if self._autoKick then
-			self._autoKick.OnGoalScored:Connect(function(player, slotId, npcId)
-				if player ~= Players.LocalPlayer then return end
-				self:_ShowGoalEffect()
-			end)
-		end
 
 		self:_UpdateCoins(self._reward:GetCoins(), 0)
 	end,

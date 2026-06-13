@@ -53,15 +53,15 @@ local NPCProgressService = Knit.CreateService({
 		end
 
 		task.spawn(function()
-			while pd.minuteCount < Constants.ONLINE_TOTAL_MINUTES do
+			while pd.totalSeconds < Constants.ONLINE_TOTAL_MINUTES * 60 do
 				task.wait(1)
 				pd.totalSeconds = pd.totalSeconds + 1
 
-				local newMin = math.floor(pd.totalSeconds / 60)
+				local newMin = math.floor(pd.totalSeconds / Constants.NPC_UNLOCK_COUNTDOWN)
 				if newMin > pd.minuteCount then
 					for i = pd.minuteCount + 1, newMin do
 						local npcIdx = i + Constants.FIELD_NPC_SLOTS
-						if npcIdx <= #NPCData.NPCList then
+						if npcIdx <= Constants.ACTIVE_NPC_COUNT then
 							table.insert(pd.queue, NPCData.NPCList[npcIdx].id)
 							self.Client.OnMinuteReached:Fire(player, i, NPCData.NPCList[npcIdx].displayName)
 						end
@@ -69,7 +69,7 @@ local NPCProgressService = Knit.CreateService({
 					pd.minuteCount = newMin
 				end
 
-				if pd.minuteCount >= Constants.ONLINE_TOTAL_MINUTES and not pd.teamComplete then
+				if pd.minuteCount >= (Constants.ACTIVE_NPC_COUNT - Constants.FIELD_NPC_SLOTS) and not pd.teamComplete then
 					pd.teamComplete = true
 					self.Client.OnTeamComplete:Fire(player)
 				end

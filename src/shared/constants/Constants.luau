@@ -17,8 +17,8 @@ local Constants = {
     MAX_BALLS_ON_FIELD = 3,         -- 场上同时存在的球数量上限
     NPC_RUN_ANIM_ID = "rbxassetid://913376220",    -- NPC 奔跑动画 ID
     NPC_KICK_ANIM_ID = "rbxassetid://129320048058024", -- NPC 踢球动画 ID
-    ONLINE_TOTAL_MINUTES = 10,      -- 在线进度总时长（分钟）
-    NPC_UNLOCK_COUNTDOWN = 60,      -- 新 NPC 出现在场上的倒计时（秒）
+    ONLINE_TOTAL_MINUTES = 5,       -- 在线进度总时长（分钟）- 测试阶段减半
+    NPC_UNLOCK_COUNTDOWN = 30,      -- 新 NPC 出现在场上的倒计时（秒）- 测试阶段减半
 }
 
 return Constants

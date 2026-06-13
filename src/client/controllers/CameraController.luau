@@ -75,7 +75,8 @@ local CameraController = Knit.CreateController({
     _GoalReplay = function(self)
         if not self._camera then return end
 
-        local goal = Workspace:FindFirstChild("Field_1")
+		local fieldMgr = Knit.GetService("FieldManagerService")
+		local goal = fieldMgr:GetField(Players.LocalPlayer)
         if goal then
             goal = goal:FindFirstChild("_door")
         end

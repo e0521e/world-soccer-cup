@@ -119,22 +119,24 @@ local AutoKickService = Knit.CreateService({
     end,
 
     _FlyBallToGoal = function(self, player, ball, slotData)
-        local goal = workspace:FindFirstChild("Field_1"):FindFirstChild("_door")
-        if not goal then return end
-        local goalChk = goal:FindFirstChild("goal_chk")
-        if not goalChk then return end
+		local fieldMgr = Knit.GetService("FieldManagerService")
+		local field = fieldMgr:GetField(player)
+		local goal = field and field:FindFirstChild("_door")
+		if not goal then return end
+		local goalChk = goal:FindFirstChild("goal_chk")
+		if not goalChk then return end
 
-        local gPos = goalChk.Position
-        local gSize = goalChk.Size
-        local targetPos = Vector3.new(
-            gPos.X,
-            Constants.BALL_LAND_Y + 0.1,
-            gPos.Z - gSize.Z / 2 + 1 + math.random() * (gSize.Z - 2)
-        )
-        local mainPart = ball:FindFirstChild("Main")
-        if not mainPart then return end
+		local gPos = goalChk.Position
+		local gSize = goalChk.Size
+		local targetPos = Vector3.new(
+			gPos.X,
+			Constants.BALL_LAND_Y + 0.1,
+			gPos.Z - gSize.Z / 2 + 1 + math.random() * (gSize.Z - 2)
+		)
+		local mainPart = ball:FindFirstChild("Main")
+		if not mainPart then return end
 
-        self.Client.OnBallFlying:Fire(player, slotData.slotId, mainPart.Position, targetPos)
+		self.Client.OnBallFlying:Fire(player, slotData.slotId, mainPart.Position, targetPos)
 
         local shootSound = mainPart:FindFirstChild("Shoot")
         if shootSound then
@@ -177,12 +179,14 @@ local AutoKickService = Knit.CreateService({
     end,
 
     _DetectGoal = function(self, player, ball, mainPart, goalPos, slotData)
-        local goal = workspace:FindFirstChild("Field_1"):FindFirstChild("_door")
-        if not goal then return end
-        local goalChk = goal:FindFirstChild("goal_chk")
-        if not goalChk then return end
+		local fieldMgr = Knit.GetService("FieldManagerService")
+		local field = fieldMgr:GetField(player)
+		local goal = field and field:FindFirstChild("_door")
+		if not goal then return end
+		local goalChk = goal:FindFirstChild("goal_chk")
+		if not goalChk then return end
 
-        local dist = (mainPart.Position - goalChk.Position).Magnitude
+		local dist = (mainPart.Position - goalChk.Position).Magnitude
         local scored = dist < 15
 
         if scored then

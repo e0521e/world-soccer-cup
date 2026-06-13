@@ -19,7 +19,7 @@ local BallSpawnService = Knit.CreateService({
     _activeBalls = {},
     _spawnTimer = nil,
 
-    SpawnBall = function(self)
+    SpawnBall = function(self, field)
         local ballFolder = ServerStorage:FindFirstChild("Ball")
         if not ballFolder then return end
 
@@ -38,8 +38,12 @@ local BallSpawnService = Knit.CreateService({
             return
         end
 
-        local penaltyX = 70 + math.random() * 35
-        local penaltyZ = -25 + math.random() * 50
+        local centerZ = field:GetAttribute("CenterZ") or 0
+        local centerX = field:GetAttribute("CenterX") or 0
+        local mirrored = field:GetAttribute("Mirrored") or false
+        local relX = 70 + math.random() * 35
+        local penaltyX = mirrored and (centerX - relX) or (centerX + relX)
+        local penaltyZ = centerZ - 25 + math.random() * 50
         local dropPos = Vector3.new(penaltyX, Constants.BALL_SPAWN_DROP_HEIGHT, penaltyZ)
 
         mainPart.Position = dropPos
@@ -154,7 +158,8 @@ local BallSpawnService = Knit.CreateService({
     end,
 
     _FlyBallToGoal = function(self, player, ball, ballData)
-        local goal = workspace:FindFirstChild("Field_1")
+		local fieldMgr = Knit.GetService("FieldManagerService")
+		local goal = fieldMgr:GetField(player)
         if not goal then return end
         goal = goal:FindFirstChild("_door")
         if not goal then return end
@@ -249,6 +254,7 @@ local BallSpawnService = Knit.CreateService({
     end,
 
     KnitStart = function(self)
+        local fieldMgr = Knit.GetService("FieldManagerService")
         task.spawn(function()
             while true do
                 task.wait(Constants.BALL_SPAWN_INTERVAL)
@@ -257,7 +263,14 @@ local BallSpawnService = Knit.CreateService({
                     totalBalls += 1
                 end
                 if totalBalls < Constants.MAX_BALLS_ON_FIELD then
-                    self:SpawnBall()
+                    local players = game:GetService("Players"):GetPlayers()
+                    for _, player in ipairs(players) do
+                        local field = fieldMgr:GetField(player)
+                        if field then
+                            self:SpawnBall(field)
+                            break
+                        end
+                    end
                 end
             end
         end)

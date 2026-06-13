@@ -3,6 +3,7 @@
 local Knit = require(game:GetService("ReplicatedStorage").Packages.Knit)
 local Constants = require(game:GetService("ReplicatedStorage").Shared.constants.Constants)
 local NPCData = require(game:GetService("ReplicatedStorage").Shared.configs.NPCData)
+local ServerStorage = game:GetService("ServerStorage")
 
 local NPCTimerService = Knit.CreateService({
     Name = "NPCTimerService",
@@ -57,7 +58,8 @@ local NPCTimerService = Knit.CreateService({
 
     ActivateNPCs = function(self, player)
         local positions = {}
-        local field = workspace:FindFirstChild("Field_1")
+        local fieldMgr = Knit.GetService("FieldManagerService")
+        local field = fieldMgr:GetField(player)
         if field then
             local placeholderFolder = field:FindFirstChild("Player")
             if placeholderFolder then
@@ -69,7 +71,9 @@ local NPCTimerService = Knit.CreateService({
                     end
                 end
                 for _, child in ipairs(children) do
-                    child:Destroy()
+                    if child:IsA("BasePart") or child:IsA("Model") then
+                        child:Destroy()
+                    end
                 end
             end
         end
@@ -84,20 +88,25 @@ local NPCTimerService = Knit.CreateService({
 
         local slots = {}
         self._playerSlots[player] = slots
-        local progressService = Knit.GetService("NPCProgressService")
         local playerService = Knit.GetService("PlayerService")
 
-        local slotCount = math.min(#positions, Constants.ACTIVE_NPC_COUNT)
-        for i = 1, slotCount do
-            local npcId = progressService:DequeueNextNPC(player)
-            if not npcId then break end
+        -- Pre-assign 10 NPCs to 3 slots, round-robin
+        local slotQueues = { {}, {}, {} }
+        for i = 1, Constants.ACTIVE_NPC_COUNT do
+            local slotIdx = ((i - 1) % 3) + 1
+            table.insert(slotQueues[slotIdx], NPCData.NPCList[i].id)
+        end
 
+        for i = 1, 3 do
+            local npcId = slotQueues[i][1]
             local quality = playerService:GetNPCQuality(player, npcId)
             local qualityData = NPCData.QualityTiers[quality] or NPCData.QualityTiers[1]
 
             local slotData = {
                 slotId = i,
                 npcId = npcId,
+                npcQueue = slotQueues[i],
+                npcIndex = 1,
                 quality = quality,
                 qualityMultiplier = qualityData.multiplier,
                 timerRemaining = 0,
@@ -112,36 +121,27 @@ local NPCTimerService = Knit.CreateService({
         end
 
         if slots[1] then
-            for _, slotData in pairs(slots) do
-                local duration = Constants.NPC_UNLOCK_COUNTDOWN * slotData.slotId
-                self:_BeginTimer(player, slotData, duration)
-            end
+            self:_BeginTimer(player, slots[1], Constants.NPC_UNLOCK_COUNTDOWN)
+        end
+        if slots[2] then
+            self:_BeginTimer(player, slots[2], Constants.NPC_UNLOCK_COUNTDOWN * 2)
+        end
+        if slots[3] then
+            self:_BeginTimer(player, slots[3], Constants.NPC_UNLOCK_COUNTDOWN * 3)
         end
     end,
 
     _PlaceNPCOnField = function(self, player, slotData)
+        local displayName = self:_getNPCNameById(slotData.npcId)
+        if not displayName then return end
+
+        local npcFolder = game:GetService("ServerStorage"):FindFirstChild("Player")
         local npcModel = nil
-        local npcFolder = game:GetService("ServerStorage"):FindFirstChild("Players")
         if npcFolder then
-            local displayName = self:_getNPCNameById(slotData.npcId)
-            if displayName then
-                npcModel = npcFolder:FindFirstChild(displayName)
-            end
-            if not npcModel then
-                for _, child in ipairs(npcFolder:GetChildren()) do
-                    if child:IsA("Model") then
-                        npcModel = child
-                        break
-                    end
-                end
-            end
-        end
-        if not npcModel then
-            local field = workspace:FindFirstChild("Field_1")
-            local fallback = field and field:FindFirstChild("Player")
-            if fallback then
-                for _, child in ipairs(fallback:GetChildren()) do
-                    if child:IsA("Model") then npcModel = child break end
+            for _, child in ipairs(npcFolder:GetDescendants()) do
+                if child:IsA("Model") and child.Name == displayName then
+                    npcModel = child
+                    break
                 end
             end
         end
@@ -156,8 +156,14 @@ local NPCTimerService = Knit.CreateService({
         if not pos then return end
         local primary = npcModel:FindFirstChild("HumanoidRootPart")
         if primary then
-            primary.Anchored = false
-            primary.CFrame = CFrame.new(pos) * CFrame.Angles(0, math.rad(90), 0)
+            for _, part in ipairs(npcModel:GetDescendants()) do
+                if part:IsA("BasePart") then
+                    part.Anchored = false
+                end
+            end
+            local ox = (math.random() - 0.5) * 6
+            local oz = (math.random() - 0.5) * 6
+            primary.CFrame = CFrame.new(pos.X + ox, pos.Y + 2.5, pos.Z + oz) * CFrame.Angles(0, math.rad(90), 0)
         end
         if humanoid then
             humanoid.WalkSpeed = 0
@@ -295,7 +301,7 @@ local NPCTimerService = Knit.CreateService({
                 playerService:TakeoverNPC(player, slotData)
                 if not slotData.firstClaimDone then
                     slotData.firstClaimDone = true
-                    self:_FillSlot(player, slotData.slotId)
+                    self:_AdvanceSlotNPC(player, slotData)
                 end
             end
         end)
@@ -417,42 +423,34 @@ local NPCTimerService = Knit.CreateService({
         end
     end,
 
-    _FillSlot = function(self, player, slotId)
-        task.delay(3, function()
-            local progressService = Knit.GetService("NPCProgressService")
-            local playerService = Knit.GetService("PlayerService")
-            local npcId = nil
-            for _ = 1, 10 do
-                npcId = progressService:DequeueNextNPC(player)
-                if npcId then break end
-                task.wait(1)
-            end
-            if not npcId then return end
+    _AdvanceSlotNPC = function(self, player, slotData)
+        slotData.npcIndex += 1
+        local queue = slotData.npcQueue
+        if not queue or slotData.npcIndex > #queue then return end
 
-            local quality = playerService:GetNPCQuality(player, npcId)
-            local qualityData = NPCData.QualityTiers[quality] or NPCData.QualityTiers[1]
+        local npcId = queue[slotData.npcIndex]
+        local playerService = Knit.GetService("PlayerService")
+        local quality = playerService:GetNPCQuality(player, npcId)
+        local qualityData = NPCData.QualityTiers[quality] or NPCData.QualityTiers[1]
 
-            local newSlot = {
-                slotId = slotId,
-                npcId = npcId,
-                quality = quality,
-                qualityMultiplier = qualityData.multiplier,
-                timerRemaining = 0,
-                isActive = false,
-                npcModel = nil,
-                claimPrompt = nil,
-                claimed = false,
-                firstClaimDone = false,
-            }
-            local slots = self._playerSlots[player]
-            local oldSlot = slots[slotId]
-            slots[slotId] = newSlot
-            self:_PlaceNPCOnField(player, newSlot)
-            self:_BeginTimer(player, newSlot, Constants.NPC_UNLOCK_COUNTDOWN)
-            if oldSlot then
-                self:_CleanupClaimPrompt(oldSlot)
-            end
-        end)
+        local newSlot = {
+            slotId = slotData.slotId,
+            npcId = npcId,
+            npcQueue = slotData.npcQueue,
+            npcIndex = slotData.npcIndex,
+            quality = quality,
+            qualityMultiplier = qualityData.multiplier,
+            timerRemaining = 0,
+            isActive = false,
+            npcModel = nil,
+            claimPrompt = nil,
+            claimed = false,
+            firstClaimDone = false,
+        }
+        local slots = self._playerSlots[player]
+        slots[slotData.slotId] = newSlot
+        self:_PlaceNPCOnField(player, newSlot)
+        self:_BeginTimer(player, newSlot, Constants.NPC_UNLOCK_COUNTDOWN * 3)
     end,
 
     KnitInit = function(self)

@@ -216,11 +216,21 @@ return MyController
 
 ## 4. Service 设计
 
-四种 Service 全部待实现（`src/server/services/` 当前为空）。
+服务已全部实现，位于 `src/server/services/` 目录下。
+
+| 服务 | 核心职责 |
+| --- | --- |
+| NPCTimerService | 10 NPC 预分配轮转、3 槽错开定时、自动补位（_AdvanceSlotNPC）、占位点读取 |
+| AutoKickService | NPC 寻路最近球（Humanoid:MoveTo）、跑动画、踢动画、球弧线飞行、goal_chk 进球检测 |
+| RewardService | 金币结算、等级管理、NPC 品质管理、DataStore 读写、NPC 解锁 |
+| PlayerService | 玩家会话管理、角色初始化、加入/离开处理 |
+| FieldManagerService | 模板克隆（Folder→Model）、6 场 2 列排布、玩家分配/释放、场主标牌绑定 |
+| BallSpawnService | 按场禁区掉球（CenterX/CenterZ 属性）、3 球上限、自动踢检测、玩家踢球处理 |
+| NPCProgressService | 在线时间跟踪、进度推流（OnTick/MinuteReached/TeamComplete）、供 UI 轮询 GetElapsedTime |
 
 ### 4.1 NPCTimerService
 
-管理 24 个 NPC 中 3 个活跃 NPC 的轮换计时。每个活跃 NPC 头顶显示倒计时，归零后触发自动接管。
+10 NPC 预分配轮转、3 槽错开定时、自动补位（_AdvanceSlotNPC）、占位点读取。
 
 | 方法 | 可见性 | 说明 |
 | --- | --- | --- |
@@ -254,7 +264,7 @@ type NPCSlot = {
 
 ### 4.2 AutoKickService
 
-处理 NPC 到球的自动寻路、踢球动画触发、球飞行和进球检测。这是核心 gameplay 的执行者。
+NPC 寻路最近球（Humanoid:MoveTo）、跑动画、踢动画、球弧线飞行、goal_chk 进球检测。
 
 | 方法 | 可见性 | 说明 |
 | --- | --- | --- |
@@ -351,6 +361,58 @@ end)
 | `OnPlayerReady` | Signal | 玩家初始化完成时通知客户端 |
 
 **玩家出生位置**：中场附近 `(0, 5, 0)`，位于球场中圈区域。
+
+### 4.5 FieldManagerService
+
+模板克隆（Folder→Model）、6 场 2 列排布、玩家分配/释放、场主标牌绑定。
+
+| 方法 | 可见性 | 说明 |
+| --- | --- | --- |
+| `CreateFields()` | 内部 | 从 ServerStorage 模板克隆 6 个场地，按 2 列 3 行排布 |
+| `AssignPlayerToField(player)` | 内部 | 为玩家分配空闲场地 |
+| `ReleaseField(player)` | 内部 | 玩家离开时释放场地 |
+| `SetFieldOwner(player, field)` | 内部 | 绑定场主标牌（BillboardGui 显示玩家名） |
+
+| Client 暴露 | 类型 | 说明 |
+| --- | --- | --- |
+| `OnFieldAssigned` | Signal | 玩家被分配到场地时通知（fieldIndex） |
+| `OnFieldReleased` | Signal | 场地释放时通知 |
+
+### 4.6 BallSpawnService
+
+按场禁区掉球（CenterX/CenterZ 属性）、3 球上限、自动踢检测、玩家踢球处理。
+
+| 方法 | 可见性 | 说明 |
+| --- | --- | --- |
+| `SpawnBallInField(fieldIndex)` | 内部 | 在指定场地禁区中心掉球（读取 CenterX/CenterZ 属性） |
+| `HandleAutoKick(fieldIndex)` | 内部 | 自动踢检测：超时未踢球触发 NPC 自动踢 |
+| `HandlePlayerKick(player, ball)` | 内部 | 玩家主动踢球处理 |
+| `CleanupBalls(fieldIndex)` | 内部 | 场地球数量超过 3 时清理多余球 |
+
+| Client 暴露 | 类型 | 说明 |
+| --- | --- | --- |
+| `OnBallSpawned` | Signal | 新球生成时通知（fieldIndex, ballPosition） |
+
+### 4.7 NPCProgressService
+
+在线时间跟踪、进度推流（OnTick/MinuteReached/TeamComplete）、供 UI 轮询 GetElapsedTime。
+
+| 方法 | 可见性 | 说明 |
+| --- | --- | --- |
+| `GetElapsedTime(player)` | Client | 返回当前会话总在线时间（秒） |
+| `OnTick()` | 内部 | 每 0.1 秒更新在线时间 |
+| `MinuteReached(minute)` | 内部 | 每分钟整点触发里程碑事件 |
+| `TeamComplete()` | 内部 | 全队进度完成时触发 |
+
+| Client 暴露 | 类型 | 说明 |
+| --- | --- | --- |
+| `OnTimeTick` | Signal | 每秒推送当前在线时间 |
+| `OnMinuteReached` | Signal | 每分钟里程碑通知 |
+| `OnTeamComplete` | Signal | 全队完成通知 |
+
+### Knit 信号断层说明
+
+部分服务的 Knit Client 信号无法送达客户端（如 NPCProgressService.OnTimeTick、RewardService.OnCoinsChanged）。UI 改用轮询 RemoteFunction（GetElapsedTime/GetCoins/GetLevel）替代信号绑定，同时为所有未消费信号接入空操作处理器防止队列积压。
 
 ---
 

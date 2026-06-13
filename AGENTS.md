@@ -14,7 +14,7 @@
 
 ## 命名规范
 
-- 脚本文件：*.server.luau（服务器）、*.client.luau（客户端）、init.luau（ModuleScript）
+- 脚本文件：*.server.luau（服务器）、*.client.luau（客户端）、*.luau（ModuleScript）
 - 文件夹：PascalCase（如 PlayerData）
 
 ## AI 工作原则

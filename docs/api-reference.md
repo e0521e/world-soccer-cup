@@ -65,6 +65,18 @@
 | _StartTimer | `(slotId: number, duration: number)` | `()` | 创建 3-2-1 倒计时 Tween，每秒触发 OnTimerUpdated |
 | _OnTimerExpired | `(slotId: number)` | `()` | 广播 OnTimerExpired 并通知 PlayerService 接管该 NPC |
 
+#### NPC轮转（新设计）
+
+10 个 NPC 预分配到 3 个槽位轮转队列。到期自动补位。
+
+##### 内部方法（新增）
+
+| 方法 | 参数 | 返回值 | 说明 |
+| ---- | ---- | ------ | ---- |
+| ActivateNPCs | `(player)` | `()` | 初始占位 3 个 NPC，错开定时 |
+| _AdvanceSlotNPC | `(player, slotData)` | `()` | 槽位轮转到下一个 NPC |
+| ResetSlot | `(player, sd)` | `()` | 品质 CD 定时重启 |
+
 ---
 
 ### 1.2 AutoKickService
@@ -73,13 +85,13 @@
 
 **简述**: 接管 NPC 后自动执行完整踢球流程：寻路到最近球、播放踢球动画、球飞行至球门、检测进球。
 
-#### 公开方法（Client 表）
+#### 1.2.1 公开方法（Client 表）
 
 | 方法 | 参数 | 返回值 | 权限 | 说明 |
 | ---- | ---- | ------ | ---- | ---- |
 | （无公开方法） | | | | 全部由服务器自动驱动 |
 
-#### 信号
+#### 1.2.2 信号
 
 | 信号 | 参数 | 触发时机 | 说明 |
 | ---- | ---- | -------- | ---- |
@@ -88,7 +100,7 @@
 | OnBallFlying | `(ballPos: Vector3, startPos: Vector3, targetPos: Vector3)` | 球离脚 | 球沿弧线飞向球门 |
 | OnGoalScored | `(npcId: string, reward: number)` | 球进门 | 进球确认，通知 RewardService |
 
-#### 内部方法
+#### 1.2.3 内部方法
 
 | 方法 | 参数 | 返回值 | 说明 |
 | ---- | ---- | ------ | ---- |
@@ -106,7 +118,7 @@
 
 **简述**: 管理玩家金币结算、等级系统、NPC 品质管理、DataStore 持久化以及 NPC 解锁。
 
-#### 公开方法（Client 表）
+#### 1.3.1 公开方法（Client 表）
 
 | 方法 | 参数 | 返回值 | 权限 | 说明 |
 | ---- | ---- | ------ | ---- | ---- |
@@ -116,7 +128,7 @@
 | GetNPCQuality | `(npcId: string)` | `{quality: number, multiplier: number}` | Client | 获取指定 NPC 品质 |
 | GetUnlockedNPCs | `()` | `{string}` | Client | 获取已解锁的 NPC ID 列表 |
 
-#### 信号
+#### 1.3.2 信号
 
 | 信号 | 参数 | 触发时机 | 说明 |
 | ---- | ---- | -------- | ---- |
@@ -125,7 +137,7 @@
 | OnNPCQualityUp | `(npcId: string, newQuality: number, multiplier: number)` | NPC 品质提升 | NPC 品质变化（重生或购买） |
 | OnNPCUnlocked | `(npcId: string, cost: number)` | NPC 解锁成功 | 玩家消耗金币解锁新 NPC |
 
-#### 内部方法
+#### 1.3.3 内部方法
 
 | 方法 | 参数 | 返回值 | 说明 |
 | ---- | ---- | ------ | ---- |
@@ -154,27 +166,74 @@
 
 **简述**: 管理玩家会话生命周期：加入/离开、当前接管槽位、NPC 选择。
 
-#### 公开方法（Client 表）
+#### 1.4.1 公开方法（Client 表）
 
 | 方法 | 参数 | 返回值 | 权限 | 说明 |
 | ---- | ---- | ------ | ---- | ---- |
 | GetActiveSlot | `()` | `number?` | Client | 获取当前接管中的 NPC 槽位编号 |
 | SelectNPC | `(npcId: string)` | `boolean` | Client | 从已解锁 NPC 中选择一位设为默认 |
 
-#### 信号
+#### 1.4.2 信号
 
 | 信号 | 参数 | 触发时机 | 说明 |
 | ---- | ---- | -------- | ---- |
 | OnCharacterChanged | `(npcId: string)` | 切换默认 NPC | 玩家选中的默认 NPC 变更 |
 | OnTakeover | `(slotId: number, npcId: string)` | 接管 NPC 时 | 玩家被自动移至 NPC 位置开始控制 |
 
-#### 内部方法
+#### 1.4.3 内部方法
 
 | 方法 | 参数 | 返回值 | 说明 |
 | ---- | ---- | ------ | ---- |
 | OnPlayerAdded | `(player: Player)` | `()` | 玩家加入时加载数据、创建角色 |
 | OnPlayerRemoving | `(player: Player)` | `()` | 玩家离开时保存数据、清理角色 |
 | _TeleportToNPC | `(player: Player, npcId: string)` | `()` | 将玩家角色移至 NPC 所在位置 |
+
+---
+
+### 1.5 FieldManagerService
+
+**文件路径**: `src/server/services/FieldManagerService.luau`
+
+**简述**: 管理球场克隆、玩家分配、场主标牌。
+
+#### 1.5.1 公开方法（Client 表）
+
+| 方法 | 参数 | 返回值 | 权限 | 说明 |
+| ---- | ---- | ------ | ---- | ---- |
+| GetFieldName | `()` | `string` | Client | 获取分配的场名 |
+
+#### 1.5.2 内部方法
+
+| 方法 | 参数 | 返回值 | 说明 |
+| ---- | ---- | ------ | ---- |
+| GetField | `(player)` | `Model?` | 获取玩家分配的场 Model |
+| _AssignField | `(player)` | `Model?` | 分配空闲场 |
+| _ReleaseField | `(player)` | `()` | 释放场 |
+| _MirrorField | `(fieldModel, xOffset, zOffset)` | `()` | 绕 Y 旋转 180° + 平移 |
+| _UpdatePlayerGuis | `(field, player)` | `()` | 更新场主标牌（头像+名字） |
+| _ClearPlayerGuis | `(field)` | `()` | 清除场主标牌 |
+
+---
+
+### 1.6 NPCProgressService
+
+**文件路径**: `src/server/services/NPCProgressService.luau`
+
+**简述**: 在线时间进度、NPC 解锁队列。
+
+#### 1.6.1 公开方法（Client 表）
+
+| 方法 | 参数 | 返回值 | 权限 | 说明 |
+| ---- | ---- | ------ | ---- | ---- |
+| GetElapsedTime | `()` | `number` | Client | 获取已在线秒数 |
+| GetQueueSize | `()` | `number` | Client | 获取队列待领取数量 |
+
+#### 1.6.2 内部方法
+
+| 方法 | 参数 | 返回值 | 说明 |
+| ---- | ---- | ------ | ---- |
+| DequeueNextNPC | `(player)` | `string?` | 从队列出队一个 NPC ID |
+| _InitPlayer | `(player)` | `()` | 初始化进度跟踪循环 |
 
 ---
 
@@ -193,7 +252,7 @@
 | NPCTimerService | NPC 激活 / 倒计时更新事件 |
 | RewardService | 金币变化事件 |
 
-#### 内部方法
+#### 2.1.1 内部方法
 
 | 方法 | 参数 | 说明 |
 | ---- | ---- | ---- |
@@ -210,7 +269,7 @@
 
 **简述**: 管理游戏视角：NPC 随行视角、踢球时镜头跟进、进球回放后复位。
 
-#### 内部方法
+#### 2.1.2 内部方法
 
 | 方法 | 参数 | 说明 |
 | ---- | ---- | ---- |
