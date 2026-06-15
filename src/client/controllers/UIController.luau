@@ -8,6 +8,7 @@ local CoreBarView = require(script.Parent.Parent.views.CoreBarView)
 local InfoBarView = require(script.Parent.Parent.views.InfoBarView)
 local ActionPanelView = require(script.Parent.Parent.views.ActionPanelView)
 local OverlayView = require(script.Parent.Parent.views.OverlayView)
+local ShopView = require(script.Parent.Parent.views.ShopView)
 
 local function getNPCName(npcId: string): string
 	for _, npc in ipairs(NPCData.NPCList) do
@@ -58,7 +59,7 @@ local UIController = Knit.CreateController({
 					self._teamDone = true
 					self._toast:Show({
 						emoji = "🏆",
-						title = "踢球队完成!",
+						title = "Team Complete!",
 						duration = 3,
 					})
 				end
@@ -76,16 +77,13 @@ local UIController = Knit.CreateController({
 		end)
 
 		local npcTimer = Knit.GetService("NPCTimerService")
-		npcTimer.OnTimerUpdated:Connect(function(player, slotId, remaining)
-			if player ~= Players.LocalPlayer then return end
-		end)
 		npcTimer.OnNPCActivated:Connect(function(player, slotId, npcId, duration)
 			if player ~= Players.LocalPlayer then return end
 			local name = getNPCName(npcId)
 			self._toast:Show({
 				emoji = "⏳",
 				title = name,
-				body = "将在 <b>" .. tostring(duration) .. "</b> 秒后准备就绪",
+				body = "Ready in <b>" .. tostring(duration) .. "</b>s",
 				duration = 2,
 			})
 		end)
@@ -95,7 +93,7 @@ local UIController = Knit.CreateController({
 			self._toast:Show({
 				emoji = "✅",
 				title = name,
-				body = "已就绪! 按 <b>E</b> 认领",
+				body = "Ready! Press <b>E</b>",
 				duration = 3,
 			})
 		end)
@@ -120,25 +118,18 @@ local UIController = Knit.CreateController({
 		self._actionPanel = ActionPanelView.new(self._screenGui)
 		self._overlay = OverlayView.new(self._screenGui)
 
+		self._shopView = ShopView.new(self._screenGui)
+
 		self._actionPanel:SetShopCallback(function()
-			local hasCoins = self._reward:GetCoins() >= 100
-			local levelInfo = self._reward:GetLevel()
-			local bodyText = if hasCoins
-				then '当前等级: <b>Lv.' .. tostring(levelInfo.level) .. '</b> (x' .. tostring(levelInfo.multiplier) .. ')<br/>升级需: <font color="gold">100 Coins</font>'
-				else 'Coins 不足! (需要 100)'
-			self._toast:Show({
-				emoji = "🏪",
-				title = "商店",
-				body = bodyText,
-				duration = 3,
-			})
+			self._shopView._activeTab = "Products"
+			self._shopView:Open()
 		end)
 
 		self._actionPanel:SetRebirthCallback(function()
 			self._toast:Show({
 				emoji = "🔄",
-				title = "重生",
-				body = "功能开发中...",
+				title = "Rebirth",
+				body = "Coming soon...",
 				duration = 2,
 			})
 		end)

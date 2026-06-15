@@ -4,9 +4,6 @@ local Knit = require(game:GetService("ReplicatedStorage").Packages.Knit)
 local ServerStorage = game:GetService("ServerStorage")
 
 local MAX_FIELDS = 6
-local ROW_Z = { -112, 0, 112 }
-local ROW_A_X = -10
-local ROW_B_X = 10
 
 local FieldManagerService = Knit.CreateService({
     Name = "FieldManagerService",
@@ -99,63 +96,21 @@ local FieldManagerService = Knit.CreateService({
         end
     end,
 
-    _MirrorField = function(self, fieldModel, xOffset, zOffset)
-        local firstPart = nil
-        for _, part in ipairs(fieldModel:GetDescendants()) do
-            if part:IsA("BasePart") then firstPart = part break end
-        end
-        if not firstPart then return end
-
-        fieldModel.PrimaryPart = firstPart
-        local cf = firstPart.CFrame
-        local targetPos = Vector3.new(-cf.Position.X + xOffset, cf.Position.Y, -cf.Position.Z + zOffset)
-        fieldModel:SetPrimaryPartCFrame(CFrame.new(targetPos) * CFrame.Angles(0, math.pi, 0))
-        fieldModel.PrimaryPart = nil
-    end,
 
     KnitInit = function(self)
         print("FieldManagerService initialized")
     end,
 
     KnitStart = function(self)
-        local fieldFolder = workspace:FindFirstChild("Field_1")
-        if fieldFolder then
+        local template = workspace:FindFirstChild("Field_1")
+        if template then
             local existing = ServerStorage:FindFirstChild("FieldTemplate")
             if existing then existing:Destroy() end
-
-            local model = Instance.new("Model")
-            model.Name = "FieldTemplate"
-            for _, child in ipairs(fieldFolder:GetChildren()) do
-                child.Parent = model
-            end
-            for _, part in ipairs(model:GetDescendants()) do
-                if part:IsA("BasePart") then
-                    model.PrimaryPart = part
-                    break
-                end
-            end
-            model.Parent = ServerStorage
-            fieldFolder:Destroy()
-            print("FieldManagerService: converted Field_1 to Model FieldTemplate")
-        end
-
-        template = ServerStorage:FindFirstChild("FieldTemplate")
-        if template and template:IsA("Folder") then
-            local model = Instance.new("Model")
-            model.Name = "FieldTemplate"
-            for _, child in ipairs(template:GetChildren()) do
-                child.Parent = model
-            end
-            for _, part in ipairs(model:GetDescendants()) do
-                if part:IsA("BasePart") then
-                    model.PrimaryPart = part
-                    break
-                end
-            end
-            model.Parent = ServerStorage
-            template:Destroy()
-            template = model
-            print("FieldManagerService: converted ServerStorage.FieldTemplate to Model")
+            template.Name = "FieldTemplate"
+            template.Parent = ServerStorage
+            print("FieldManagerService: moved Field_1 to ServerStorage as FieldTemplate")
+        else
+            template = ServerStorage:FindFirstChild("FieldTemplate")
         end
         if not template then
             warn("FieldManagerService: no FieldTemplate found")
@@ -163,42 +118,24 @@ local FieldManagerService = Knit.CreateService({
         end
 
         local fieldIdx = 0
-        for _, zOffset in ipairs(ROW_Z) do
+        for i = 0, 5 do
             fieldIdx += 1
-            local field = Instance.new("Model")
-            field.Name = "Field_" .. tostring(fieldIdx)
-            for _, child in ipairs(template:GetChildren()) do
-                local c = child:Clone()
-                c.Parent = field
-            end
-            field.Parent = workspace
-            for _, part in ipairs(field:GetDescendants()) do
-                if part:IsA("BasePart") then
-                    part.Position = part.Position + Vector3.new(ROW_A_X, 0, zOffset)
-                end
-            end
-            field:SetAttribute("CenterX", ROW_A_X)
-            field:SetAttribute("CenterZ", zOffset)
-            field:SetAttribute("Mirrored", false)
-            table.insert(self._freeFields, field)
-            print("FieldManagerService: created " .. field.Name .. " at X=" .. tostring(ROW_A_X) .. " Z=" .. tostring(zOffset))
-        end
+            local rad = math.rad(i * 60)
 
-        for _, zOffset in ipairs(ROW_Z) do
-            fieldIdx += 1
-            local field = Instance.new("Model")
+            local field = template:Clone()
             field.Name = "Field_" .. tostring(fieldIdx)
-            for _, child in ipairs(template:GetChildren()) do
-                local c = child:Clone()
-                c.Parent = field
-            end
-            self:_MirrorField(field, ROW_B_X, zOffset)
             field.Parent = workspace
-            field:SetAttribute("CenterX", ROW_B_X)
-            field:SetAttribute("CenterZ", zOffset)
-            field:SetAttribute("Mirrored", true)
+
+            local primary = field.PrimaryPart
+            if primary then
+                field:PivotTo(
+                    primary.CFrame * CFrame.Angles(0, rad, 0)
+                )
+            end
+
+            field:SetAttribute("Angle", i * 60)
             table.insert(self._freeFields, field)
-            print("FieldManagerService: created " .. field.Name .. " at X=" .. tostring(ROW_B_X) .. " Z=" .. tostring(zOffset) .. " (mirrored)")
+            print("FieldManagerService: created " .. field.Name .. " rotated " .. tostring(i * 60) .. " deg")
         end
 
         game:GetService("Players").PlayerAdded:Connect(function(player)

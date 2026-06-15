@@ -34,6 +34,10 @@ local RewardService = Knit.CreateService({
             return self.Server:UnlockNPC(player, npcId)
         end,
 
+        DeductCoins = function(self, player, amount)
+            return self.Server:DeductCoins(player, amount)
+        end,
+
         OnCoinsChanged = Knit.CreateSignal(),
         OnLevelUp = Knit.CreateSignal(),
         OnNPCQualityUp = Knit.CreateSignal(),
@@ -129,6 +133,23 @@ local RewardService = Knit.CreateService({
         return true
     end,
 
+    DeductCoins = function(self, player, amount)
+        local data = self._playerData[player]
+        if not data or data.Coins < amount then return false end
+        data.Coins -= amount
+        self.Client.OnCoinsChanged:Fire(player, data.Coins, -amount)
+        self:_SaveData(player)
+        return true
+    end,
+
+    AwardCoinsDirect = function(self, player, amount)
+        local data = self._playerData[player]
+        if not data then return end
+        data.Coins += amount
+        self.Client.OnCoinsChanged:Fire(player, data.Coins, amount)
+        self:_SaveData(player)
+    end,
+
     AwardGoal = function(self, player, npcId)
         local data = self._playerData[player]
         if not data then return end
@@ -138,6 +159,12 @@ local RewardService = Knit.CreateService({
         local qualityConfig = NPCData.QualityTiers[quality] or NPCData.QualityTiers[1]
 
         local coins = Constants.BASE_COINS * levelConfig.multiplier * qualityConfig.multiplier
+
+        local ok, shopService = pcall(Knit.GetService, Knit, "ShopService")
+        if ok and shopService and shopService:HasGamePass(player, 1696596147) then
+            coins *= 2
+        end
+
         coins = math.floor(coins)
 
         data.Coins += coins

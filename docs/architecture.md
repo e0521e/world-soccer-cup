@@ -224,9 +224,10 @@ return MyController
 | AutoKickService | NPC 寻路最近球（Humanoid:MoveTo）、跑动画、踢动画、球弧线飞行、goal_chk 进球检测 |
 | RewardService | 金币结算、等级管理、NPC 品质管理、DataStore 读写、NPC 解锁 |
 | PlayerService | 玩家会话管理、角色初始化、加入/离开处理 |
-| FieldManagerService | 模板克隆（Folder→Model）、6 场 2 列排布、玩家分配/释放、场主标牌绑定 |
-| BallSpawnService | 按场禁区掉球（CenterX/CenterZ 属性）、3 球上限、自动踢检测、玩家踢球处理 |
+| FieldManagerService | 模板克隆（Folder→Model）、6 场六边形排布（HEX_RADIUS=110，30°起始，60°间隔）、玩家分配/释放、场主标牌绑定 |
+| BallSpawnService | 中场掉球（中心 40×40 区域）、3 球上限、NPC 自动踢检测 |
 | NPCProgressService | 在线时间跟踪、进度推流（OnTick/MinuteReached/TeamComplete）、供 UI 轮询 GetElapsedTime |
+| MusicService | 音频播放：按名播放背景音乐/音效、指定父级位置、音量控制 |
 
 ### 4.1 NPCTimerService
 
@@ -418,7 +419,7 @@ end)
 
 ## 5. Controller 设计
 
-两种 Controller 全部待实现（`src/client/controllers/` 当前为空）。
+Controller 位于 `src/client/controllers/` 目录。
 
 ### 5.1 UIController
 
@@ -460,6 +461,22 @@ end)
 | AutoKickService `OnKickStarted` | 镜头切换到踢球视角 |
 | AutoKickService `OnBallFlying` | 镜头跟随球飞行 |
 | AutoKickService `OnGoalScored` | 触发进球回放 |
+
+### 5.3 SoundController
+
+**文件路径**: `src/client/controllers/SoundController.luau`
+
+**简述**: 客户端音效播放，监听 `ReplicatedStorage.SoundEvent` RemoteEvent，当收到 `"shoot"` 时在客户端播放踢球音效。
+
+| 公开方法 | 参数 | 说明 |
+| -------- | ---- | ---- |
+| `PlayShoot(parent?)` | 可选父级 Instance | 播放踢球音效 `shoot`（默认挂载玩家角色） |
+
+#### 播放机制
+
+- `AutoKickService._FlyBallToGoal` 球离脚时通过 `SoundEvent:FireAllClients("shoot")` 通知所有客户端
+- `SoundController` 收到 `OnClientEvent` → `Instance.new("Sound")` 设置 SoundId（`rbxassetid://8595974357`）
+- 音效默认挂载在玩家角色 `HumanoidRootPart`，播放完毕自动销毁
 
 ---
 
@@ -645,12 +662,14 @@ NPC 进球     → AutoKickService        → 通知 RewardService
 
 | 路径 | 内容 | 说明 |
 | --- | --- | --- |
-| `Workspace.Field_1` | 半足球场 | 包含场地、边线、禁区、中圈等部件 |
-| `Workspace.Field_1._door` | 球门 | 单个球门，内含 `goal_chk` Part（2×9×24, Anchored, CanTouch=true, Transparent） |
-| `Workspace.Field_1.Player` | 24 个 NPC | 著名球星 R15 模型（Messi, Ronaldo 等），Anchored |
+| `Workspace.Field_1` ~ `Field_6` | 半足球场 × 6 | 六边形排布，HEX_RADIUS=110，30°起始60°间隔；球门朝外，中场掉球 |
+| `Workspace.Field_X._door` | 球门 | 单个球门，内含 `goal_chk` Part（2×9×24, Anchored, CanTouch=true, Transparent） |
+| `Workspace.Field_X.Player` | 24 个 NPC | 著名球星 R15 模型（Messi, Ronaldo 等），Anchored |
 | `ServerStorage.Ball` | 45 个球模型 | 每个含 E_Ball(ProximityPrompt)、Main(MeshPart)、Trail、Shoot 音效 |
 | `ServerStorage.Goal` | 44 个球门模型 | 门模板，存储在 ServerStorage 中（当前未使用——仅用 _door） |
 | `ReplicatedStorage.Packages` | Wally 包 | Knit, Component, Timer 等依赖包 |
+| `SoundService.MusicGroup` | SoundGroup | 背景音乐容器，当前含 `BGM_lobby` |
+| `SoundService.SoundGroup` | SoundGroup | 音效容器，含 `Picked`, `goal_b`, `cd`, `kickOff`, `gameEnd_b/a`, `HitFrame`, `Sprint`, `shoot2`, `Rush`, `goal_c` 等 |
 
 > **关键**：Studio 中只有 1 个球门 `_door` 在球门线上使用。`ServerStorage.Goal` 中的 44 个球门模型作为模板保留，当前未在运行中使用。
 

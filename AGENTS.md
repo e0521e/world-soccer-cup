@@ -17,6 +17,12 @@
 - 脚本文件：*.server.luau（服务器）、*.client.luau（客户端）、*.luau（ModuleScript）
 - 文件夹：PascalCase（如 PlayerData）
 
+## UI 显示规范
+
+- 所有 UI 展示文本统一使用英文（包括 Title、Button、Label、Toast、StatusBar 等）
+- 游戏内货币符号：Coins 使用 `🪙`，Robux 使用 `utf8.char(0xE002)`
+- 避免使用中文 UI 文本，错误消息、提示、按钮文字、状态栏等均用英文
+
 ## AI 工作原则
 
 1. 在任何文件修改前，先说明意图
@@ -28,6 +34,7 @@
 
 - 不要修改 Packages/ 目录（由 wally install 生成）
 - 不要在 Server 代码中放客户端逻辑（安全风险）
+- 禁止使用 `Model:SetPrimaryPartCFrame()`，必须使用 `Model:PivotTo()` 替代
 
 ## Markdown 格式约定
 

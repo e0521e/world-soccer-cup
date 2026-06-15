@@ -19,6 +19,8 @@ local Events = {
     Takeover = "Takeover",
     CharacterChanged = "CharacterChanged",
     PlayerRespawned = "PlayerRespawned",
+
+    PlaySound = "PlaySound",
 }
 
 return Events

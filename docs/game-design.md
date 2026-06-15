@@ -536,6 +536,39 @@ HUD 顶部展示 `FreeKickHUD.HUD.TimeDotContainer`：
 - [ ] 每日奖励系统
 - [ ] 球/球门外观商店
 - [ ] 数值平衡调整
+- [ ] 音频系统（MusicService 已完成）
+
+---
+
+## 14. 音频系统
+
+### 14.1 音频结构
+
+所有音频资源放置在 `SoundService` 下，不通过 Rojo 管理，直接在 Studio 中手动放置：
+
+| 容器 | 类型 | 说明 |
+| --- | --- | --- |
+| `SoundService.MusicGroup` | SoundGroup | 背景音乐，当前仅 `BGM_lobby` |
+| `SoundService.SoundGroup` | SoundGroup | 游戏音效，含进球、拾取、冲刺、踢球等 |
+
+### 14.2 MusicService 职责（服务端）
+
+`MusicService`（Knit Service，`src/server/services/MusicService.luau`）负责背景音乐和全局音效：
+
+- `PlayMusic(name)` — 播放指定背景音乐（自动停止上一首）
+- `StopMusic()` — 停止当前背景音乐
+- `PlaySound(name, parent?)` — 播放指定音效，可选指定父级（在父级位置发声）
+- 服务端权威播放：音频在服务端实例化，所有客户端都能听到
+- 音效自动清理：播放完毕后自动销毁 Sound 实例
+
+### 14.3 SoundController 职责（客户端）
+
+`SoundController`（Knit Controller，`src/client/controllers/SoundController.luau`）负责客户端本地音效：
+
+- `PlayShoot(parent?)` — 播放踢球音效，默认挂载玩家角色位置发声
+- 监听 `ReplicatedStorage.SoundEvent` RemoteEvent，收到 `"shoot"` 时触发
+- 服务端 `AutoKickService` 在 `_FlyBallToGoal` 中通过 `SoundEvent:FireAllClients("shoot")` 通知
+- 自动清理：`Sound.Ended` 触发后自动销毁
 
 ---
 

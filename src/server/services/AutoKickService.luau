@@ -2,6 +2,7 @@
 
 local Knit = require(game:GetService("ReplicatedStorage").Packages.Knit)
 local Constants = require(game:GetService("ReplicatedStorage").Shared.constants.Constants)
+local ReplicatedStorage = game:GetService("ReplicatedStorage")
 
 local AutoKickService = Knit.CreateService({
     Name = "AutoKickService",
@@ -11,6 +12,8 @@ local AutoKickService = Knit.CreateService({
         OnBallFlying = Knit.CreateSignal(),
         OnGoalScored = Knit.CreateSignal(),
     },
+
+    _soundEvent = nil,
 
     ExecuteKick = function(self, player, npcModel, slotData)
         self:_WalkToNearestBall(player, npcModel, slotData)
@@ -126,17 +129,23 @@ local AutoKickService = Knit.CreateService({
 		local goalChk = goal:FindFirstChild("goal_chk")
 		if not goalChk then return end
 
-		local gPos = goalChk.Position
+        local gPos = goalChk.Position
 		local gSize = goalChk.Size
+		local toGoal = Vector3.new(gPos.X, 0, gPos.Z).Unit
+		local offsetDist = gSize.Z / 2 + 1 + math.random() * (gSize.Z - 2)
 		local targetPos = Vector3.new(
-			gPos.X,
+			gPos.X + toGoal.X * offsetDist,
 			Constants.BALL_LAND_Y + 0.1,
-			gPos.Z - gSize.Z / 2 + 1 + math.random() * (gSize.Z - 2)
+			gPos.Z + toGoal.Z * offsetDist
 		)
 		local mainPart = ball:FindFirstChild("Main")
 		if not mainPart then return end
 
 		self.Client.OnBallFlying:Fire(player, slotData.slotId, mainPart.Position, targetPos)
+
+		if self._soundEvent then
+			self._soundEvent:FireClient(player, "shoot")
+		end
 
         local shootSound = mainPart:FindFirstChild("Shoot")
         if shootSound then
@@ -187,10 +196,14 @@ local AutoKickService = Knit.CreateService({
 		if not goalChk then return end
 
 		local dist = (mainPart.Position - goalChk.Position).Magnitude
-        local scored = dist < 15
+        local scored = dist < 40
 
         if scored then
             self.Client.OnGoalScored:Fire(player, slotData.slotId, slotData.npcId)
+
+			if self._soundEvent then
+				self._soundEvent:FireClient(player, "coins")
+			end
 
             local rewardService = Knit.GetService("RewardService")
             rewardService:AwardGoal(player, slotData.npcId)
@@ -213,6 +226,9 @@ local AutoKickService = Knit.CreateService({
     end,
 
     KnitStart = function(self)
+		self._soundEvent = Instance.new("RemoteEvent")
+		self._soundEvent.Name = "SoundEvent"
+		self._soundEvent.Parent = ReplicatedStorage
         print("AutoKickService started")
     end,
 })

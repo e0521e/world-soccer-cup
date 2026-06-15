@@ -52,14 +52,14 @@ function ActionPanelView.new(screenGui: Instance)
 	layout.HorizontalAlignment = Enum.HorizontalAlignment.Center
 	layout.Parent = panel
 
-	local shop = makeButton("Shop", "🏪 商店", Color3.new(0.1, 0.4, 0.25), {
+	local shop = makeButton("Shop", "🏪 Shop", Color3.new(0.1, 0.4, 0.25), {
 		ColorSequenceKeypoint.new(0, Color3.new(0.15, 0.55, 0.3)),
 		ColorSequenceKeypoint.new(1, Color3.new(0.08, 0.3, 0.18)),
 	})
 	shop.LayoutOrder = 1
 	shop.Parent = panel
 
-	local rebirth = makeButton("Rebirth", "🔄 重生", Color3.new(0.4, 0.1, 0.1), {
+	local rebirth = makeButton("Rebirth", "🔄 Rebirth", Color3.new(0.4, 0.1, 0.1), {
 		ColorSequenceKeypoint.new(0, Color3.new(0.55, 0.15, 0.15)),
 		ColorSequenceKeypoint.new(1, Color3.new(0.3, 0.08, 0.08)),
 	})

@@ -2,6 +2,8 @@
 
 > 本文档记录项目所有 Knit Service 和 Controller 的公开 API。
 > 游戏为**半放置自由踢球自动射门**：3 名 NPC 轮流上场，倒计时结束后玩家自动接管，NPC 自动寻路踢球射门，进球获得金币。
+>
+> UI 设计细节请参阅 `docs/ui-design.md`。
 
 ---
 
@@ -127,6 +129,7 @@
 | UpgradeLevel | `()` | `boolean` | Client | 消耗 Coins 升级（自动扣除） |
 | GetNPCQuality | `(npcId: string)` | `{quality: number, multiplier: number}` | Client | 获取指定 NPC 品质 |
 | GetUnlockedNPCs | `()` | `{string}` | Client | 获取已解锁的 NPC ID 列表 |
+| DeductCoins | `(amount: number)` | `boolean` | Client | 扣减金币（ShopService 调用，外部慎用） |
 
 #### 1.3.2 信号
 
@@ -141,6 +144,8 @@
 
 | 方法 | 参数 | 返回值 | 说明 |
 | ---- | ---- | ------ | ---- |
+| DeductCoins | `(player: Player, amount: number)` | `boolean` | 扣减金币，触发 OnCoinsChanged |
+| AwardCoinsDirect | `(player: Player, amount: number)` | `()` | 直接增加金币（用于开发者产品购买奖励） |
 | _AwardCoins | `(player: Player, amount: number)` | `()` | 增加金币，触发 OnCoinsChanged |
 | _CalculateReward | `(player: Player, npcId: string)` | `number` | 按公式计算实际金币：BASE × 等级倍率 × NPC 品质倍率 |
 | _UpgradeNPCQuality | `(player: Player, npcId: string)` | `()` | 重生后提升 NPC 品质 +1（上限 5） |
@@ -237,29 +242,163 @@
 
 ---
 
-## 二、客户端 Controllers
+### 1.7 ShopService
+
+**文件路径**: `src/server/services/ShopService.luau`
+
+**简述**: 管理商店购买逻辑：Robux 开发者产品/GamePass 购买处理、金币购买 GamePass、已购所有权查询。
+
+#### 1.7.1 公开方法（Client 表）
+
+| 方法 | 参数 | 返回值 | 权限 | 说明 |
+| ---- | ---- | ------ | ---- | ---- |
+| PurchaseWithCoins | `(gamePassId: number)` | `boolean, string?` | Client | 金币购买 GamePass，成功返回 true |
+| GetOwnedGamePasses | `()` | `{number}` | Client | 获取已拥有的 GamePass ID 列表 |
+| GetProducts | `()` | `{ProductItem}` | Client | 获取完整开发者产品清单（Products.luau） |
+| GetGamePasses | `()` | `{GamePassItem}` | Client | 获取完整 GamePass 清单（GamePasses.luau） |
+| HasGamePass | `(gamePassId: number)` | `boolean` | Client | 检查是否已拥有某 GamePass |
+
+#### 1.7.2 信号
+
+| 信号 | 参数 | 触发时机 | 说明 |
+| ---- | ---- | -------- | ---- |
+| OnPurchaseComplete | `(itemType: string, itemId: number, info: {name: string, icon: string})` | 购买成功 | Robux/Coins 购买均触发 |
+| OnPurchaseFailed | `(itemType: string, itemId: number, reason: string)` | 购买失败 | 余额不足/已拥有/服务端错误 |
+
+#### 1.7.3 内部方法
+
+| 方法 | 参数 | 返回值 | 说明 |
+| ---- | ---- | ------ | ---- |
+| _GrantProduct | `(player: Player, productId: number)` | `boolean` | ProcessReceipt 回调：发放产品奖励（金币） |
+| _GrantGamePass | `(player: Player, gamePassId: number)` | `boolean` | ProcessReceipt 回调：授予 GamePass 所有权 |
+| _CheckExistingGamePasses | `(player: Player)` | `()` | 玩家加入时检查 Roblox 已有 GamePass 所有权 |
+| PurchaseWithCoins | `(player: Player, gamePassId: number)` | `boolean, string?` | 服务器端金币购买逻辑（验证→扣款→授权→信号） |
+
+#### 1.7.4 数据清单
+
+| 数据文件 | 路径 | 内容 |
+| -------- | ---- | ---- |
+| Products.luau | `src/shared/datas/Products.luau` | 3 个 Robux 金币包（500/1500/5000 Coins） |
+| GamePasses.luau | `src/shared/datas/GamePasses.luau` | 2 个 GamePass（Double Coins / Extra Stamina） |
+
+#### 1.7.5 购买流程
+
+```
+Client (ShopView)                    Server (ShopService)
+       │                                     │
+       ├── Robux 商品 ──────────────────→ MarketplaceService
+       │    PromptProductPurchase()          ProcessReceipt()
+       │    ─────────────────────────────    → _GrantProduct()
+       │    ← OnPurchaseComplete ─────────     → AwardCoinsDirect()
+       │
+       ├── Robux GamePass ──────────────→ MarketplaceService
+       │    PromptGamePassPurchase()          ProcessReceipt()
+       │    ─────────────────────────────    → _GrantGamePass()
+       │    ← OnPurchaseComplete ─────────
+       │
+       └── Coins GamePass ──────────────→ PurchaseWithCoins()
+            ShopService:PurchaseWithCoins()  → 验证余额
+            ─────────────────────────────    → DeductCoins()
+            ← OnPurchaseComplete ─────────    → 记录所有权
+                                               → Fire Signal
+```
+
+---
+
+### 1.8 MusicService
+
+**文件路径**: `src/server/services/MusicService.luau`
+
+**简述**: 管理游戏音频播放：背景音乐（MusicGroup）和音效（SoundGroup），支持按名称播放、指定父级位置发声。
+
+#### 音频资源位置
+
+| 容器 | 路径 | 内容 |
+| ---- | ---- | ---- |
+| 背景音乐 | `SoundService.MusicGroup` | `BGM_lobby` |
+| 游戏音效 | `SoundService.SoundGroup` | `Picked`, `goal_b`, `cd`, `kickOff`, `gameEnd_b`, `gameEnd_a`, `HitFrame`, `Sprint`, `shoot2`, `Rush`, `goal_c` 等 |
+
+#### 1.8.1 公开方法（Client 表）
+
+| 方法 | 参数 | 返回值 | 权限 | 说明 |
+| ---- | ---- | ------ | ---- | ---- |
+| PlayMusic | `(name: string)` | `boolean` | Client | 播放指定背景音乐，自动停止前一首 |
+| StopMusic | `()` | `()` | Client | 停止当前背景音乐并清理实例 |
+| PlaySound | `(name: string, parent: Instance?)` | `boolean` | Client | 播放指定音效，可选指定父级位置 |
+| StopAllSounds | `()` | `()` | Client | 停止所有活跃音效 |
+| SetVolume | `(volume: number)` | `()` | Client | 设置音量（0~1） |
+
+#### 1.8.2 内部方法
+
+| 方法 | 参数 | 返回值 | 说明 |
+| ---- | ---- | ------ | ---- |
+| _FindSoundInGroup | `(groupName: string, soundName: string)` | `Sound?` | 在指定 SoundGroup 中按名称查找 Sound 模板 |
+| PlayMusic | `(name: string)` | `boolean` | 服务端实现：克隆模板 → 停止旧 BGM → 播放 → 记录引用 |
+| StopMusic | `()` | `()` | 服务端实现：停止并销毁当前 BGM 实例 |
+| PlaySound | `(name: string, parent: Instance?)` | `boolean` | 服务端实现：克隆模板 → 设置父级 → 播放 → 自动清理 |
+| StopAllSounds | `()` | `()` | 停止并销毁所有活跃音效实例 |
+| SetVolume | `(volume: number)` | `()` | 更新音量并同步到当前 BGM |
+
+#### 1.8.3 播放行为
+
+| 场景 | 行为 |
+| ---- | ---- |
+| BGM 播放 | 克隆 `MusicGroup` 下的模板 Sound → 设为 Looped=true → 持续播放 → 调用 `StopMusic`/新 `PlayMusic` 时停止 |
+| 音效播放 | 克隆 `SoundGroup` 下的模板 Sound → 播放一次 → `Sound.Ended` 事件触发时自动 `Destroy()` 清理 |
+| 指定父级 | 将克隆的 Sound 实例 `.Parent = parent`，音效在父级位置发声（适用于在角色/球门等位置播放） |
+| 未指定父级 | 默认挂在 `SoundService` 下（全局发声，所有玩家可闻） |
 
 ### 2.1 UIController
 
 **文件路径**: `src/client/controllers/UIController.luau`
 
-**简述**: 管理 HUD 界面：NPC 倒计时条、金币显示、进球庆祝特效、NPC 选择界面。
+**简述**: 主 HUD 控制器——创建 ScreenGui 并组合所有 View，管理数据轮询与事件分发。
 
 #### 监听的服务
 
 | 服务 | 说明 |
 | ---- | ---- |
-| NPCTimerService | NPC 激活 / 倒计时更新事件 |
-| RewardService | 金币变化事件 |
+| AutoKickService | 进球信号 → Overlay + Toast |
+| NPCTimerService | NPC 激活/倒计时到期 → Toast |
+| RewardService | 金币/等级轮询 |
 
 #### 2.1.1 内部方法
 
 | 方法 | 参数 | 说明 |
 | ---- | ---- | ---- |
-| _UpdateTimerDisplay | `(slotId: number, remaining: number)` | 更新指定 NPC 头顶 BillboardGui 倒计时数值 |
-| _UpdateCoinsDisplay | `(amount: number)` | 更新 HUD 顶部金币数值 |
-| _ShowGoalEffect | `(reward: number)` | 播放"Goal!"文字 + 闪光 + 金币弹出动画 |
-| _ShowNPCPicker | `(unlockedNPCs: {string})` | 显示 NPC 选择界面供玩家切换默认角色 |
+| _CreateHUD | `()` | 创建 ScreenGui 并挂载所有 View（CoreBar/InfoBar/ActionPanel/Overlay/Toast/Shop） |
+
+### 2.3 SoundController
+
+**文件路径**: `src/client/controllers/SoundController.luau`
+
+**简述**: 客户端踢球音效播放——监听 `ReplicatedStorage.SoundEvent` RemoteEvent，收到 `"shoot"` 时在客户端播放。
+
+#### 公开方法
+
+| 方法 | 参数 | 说明 |
+| ---- | ---- | ---- |
+| PlayShoot | `(parent: Instance?)` | 播放踢球音效，默认挂载玩家角色 HumanoidRootPart |
+
+#### 触发链路
+
+```
+Server AutoKickService._FlyBallToGoal
+  → SoundEvent:FireAllClients("shoot")
+  → Client SoundEvent.OnClientEvent
+  → SoundController:PlayShoot()
+```
+
+#### 2.1.2 View 组合
+
+| View | 实例变量 | 初始化 |
+| ---- | -------- | ------ |
+| CoreBarView | `_coreBar` | `_CreateHUD` |
+| InfoBarView | `_infoBar` | `_CreateHUD` |
+| ActionPanelView | `_actionPanel` | `_CreateHUD` |
+| OverlayView | `_overlay` | `_CreateHUD` |
+| ToastView | `_toast` | `_CreateHUD` |
+| ShopView | `_shopView` | `_CreateHUD`（点击商店按钮打开覆盖层） |
 
 ---
 
@@ -360,6 +499,35 @@ export type KickResult = {
 
 ---
 
+### 3.4 ShopTypes
+
+**文件路径**: `src/shared/types/ShopTypes.luau`
+
+```lua
+export type ProductItem = {
+    ProductId: number,
+    Name: string,
+    Description: string,
+    PriceRobux: number,
+    PriceCoins: number,
+    Rewards: { Coins: number }?,
+    Icon: string,
+}
+
+export type GamePassItem = {
+    GamePassId: number,
+    Name: string,
+    Description: string,
+    PriceRobux: number,
+    PriceCoins: number,
+    Icon: string,
+}
+
+export type ShopTab = "Products" | "GamePasses"
+```
+
+---
+
 ## 四、事件清单
 
 | 事件名 | 触发端 | 参数 | 说明 |
@@ -371,6 +539,8 @@ export type KickResult = {
 | GoalScored | 服务端 | `(playerId: number, npcId: string, reward: number)` | 球进球门，金币结算 |
 | CoinsUpdated | 服务端 | `(newBalance: number, delta: number)` | 玩家金币余额变化 |
 | NPCUnlocked | 服务端 | `(npcId: string, cost: number)` | 玩家解锁新 NPC |
+| ShopPurchaseComplete | 服务端 | `(itemType: string, itemId: number, info: table)` | 商店购买成功（含 Robux 和 Coins） |
+| ShopPurchaseFailed | 服务端 | `(itemType: string, itemId: number, reason: string)` | 商店购买失败 |
 
 ---
 

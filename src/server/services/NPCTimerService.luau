@@ -44,7 +44,13 @@ local NPCTimerService = Knit.CreateService({
     GetTimerRemaining = function(self, player, slotId)
         local slots = self._playerSlots[player]
         if not slots or not slots[slotId] then return 0 end
-        return slots[slotId].timerRemaining
+        local sd = slots[slotId]
+        if sd.endTime then
+            local npcProg = Knit.GetService("NPCProgressService")
+            local remaining = sd.endTime - npcProg:GetElapsedTime(player)
+            return if remaining > 0 then remaining else 0
+        end
+        return sd.timerRemaining or 0
     end,
 
     _getNPCNameById = function(self, npcId)
@@ -145,8 +151,9 @@ local NPCTimerService = Knit.CreateService({
                 end
             end
         end
-        if not npcModel then return end
+		if not npcModel then return end
 
+        npcModel = npcModel:Clone()
         npcModel.Parent = workspace
         slotData.npcModel = npcModel
         local humanoid = npcModel:FindFirstChildWhichIsA("Humanoid")
@@ -276,19 +283,21 @@ local NPCTimerService = Knit.CreateService({
         end
     end,
 
-    _BeginTimer = function(self, player, slotData, duration)
+	_BeginTimer = function(self, player, slotData, duration)
         duration = duration or math.random(Constants.COUNTDOWN_MIN, Constants.COUNTDOWN_MAX)
-        slotData.timerRemaining = duration
+        local npcProg = Knit.GetService("NPCProgressService")
+        local now = npcProg:GetElapsedTime(player)
+        slotData.endTime = now + duration
         slotData.isActive = true
 
         self.Client.OnNPCActivated:Fire(player, slotData.slotId, slotData.npcId, duration)
 
         task.spawn(function()
-            while slotData.timerRemaining > 0 and slotData.isActive do
+            while slotData.isActive do
                 task.wait(1)
                 if not slotData.isActive then break end
-                slotData.timerRemaining -= 1
-                self.Client.OnTimerUpdated:Fire(player, slotData.slotId, slotData.timerRemaining)
+                local remaining = slotData.endTime - npcProg:GetElapsedTime(player)
+                slotData.timerRemaining = if remaining > 0 then remaining else 0
 
                 local npcModel = slotData.npcModel
                 if npcModel then
@@ -300,9 +309,13 @@ local NPCTimerService = Knit.CreateService({
                             if slotData.timerRemaining <= 5 then
                                 label.TextColor3 = Color3.new(1, 0, 0)
                             end
-                            label.Text = tostring(slotData.timerRemaining)
+                            label.Text = tostring(math.ceil(slotData.timerRemaining))
                         end
                     end
+                end
+
+                if slotData.timerRemaining <= 0 then
+                    break
                 end
             end
 

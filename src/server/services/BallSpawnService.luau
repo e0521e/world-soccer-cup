@@ -4,6 +4,7 @@ local Knit = require(game:GetService("ReplicatedStorage").Packages.Knit)
 local Constants = require(game:GetService("ReplicatedStorage").Shared.constants.Constants)
 local TweenService = game:GetService("TweenService")
 local ServerStorage = game:GetService("ServerStorage")
+local ReplicatedStorage = game:GetService("ReplicatedStorage")
 
 local BallSpawnService = Knit.CreateService({
     Name = "BallSpawnService",
@@ -44,13 +45,11 @@ local BallSpawnService = Knit.CreateService({
 
         ball.Parent = workspace
 
-        local centerZ = field:GetAttribute("CenterZ") or 0
-        local centerX = field:GetAttribute("CenterX") or 0
-        local mirrored = field:GetAttribute("Mirrored") or false
-        local relX = 70 + math.random() * 35
-        local penaltyX = mirrored and (centerX - relX) or (centerX + relX)
-        local penaltyZ = centerZ - 25 + math.random() * 50
-        local dropPos = Vector3.new(penaltyX, Constants.BALL_SPAWN_DROP_HEIGHT, penaltyZ)
+        local dropPos = Vector3.new(
+            (math.random() - 0.5) * 40,
+            Constants.BALL_SPAWN_DROP_HEIGHT,
+            (math.random() - 0.5) * 40
+        )
 
         ball:PivotTo(CFrame.new(dropPos))
 
@@ -67,6 +66,11 @@ local BallSpawnService = Knit.CreateService({
             dropPos = dropPos,
         }
         self.Client.OnBallSpawned:FireAll(dropPos, mainPart.Size)
+
+		local soundEvent = ReplicatedStorage:FindFirstChild("SoundEvent")
+		if soundEvent then
+			soundEvent:FireAllClients("Sprint")
+		end
 
         task.spawn(function()
             self:_WaitForLand(ball, mainPart)
@@ -159,19 +163,22 @@ local BallSpawnService = Knit.CreateService({
 
     _FlyBallToGoal = function(self, player, ball, ballData)
 		local fieldMgr = Knit.GetService("FieldManagerService")
-		local goal = fieldMgr:GetField(player)
-        if not goal then return end
-        goal = goal:FindFirstChild("_door")
+		local field = fieldMgr:GetField(player)
+        if not field then return end
+        local goal = field:FindFirstChild("_door")
         if not goal then return end
         local goalChk = goal:FindFirstChild("goal_chk")
         if not goalChk then return end
 
         local gPos = goalChk.Position
+        local gPos = goalChk.Position
         local gSize = goalChk.Size
+        local toGoal = Vector3.new(gPos.X, 0, gPos.Z).Unit
+        local offsetDist = gSize.Z / 2 + 1 + math.random() * (gSize.Z - 2)
         local targetPos = Vector3.new(
-            gPos.X,
+            gPos.X + toGoal.X * offsetDist,
             Constants.BALL_LAND_Y + 0.1,
-            gPos.Z - gSize.Z / 2 + 1 + math.random() * (gSize.Z - 2)
+            gPos.Z + toGoal.Z * offsetDist
         )
         local mainPart = ballData.mainPart
         local startPos = mainPart.Position
@@ -179,6 +186,11 @@ local BallSpawnService = Knit.CreateService({
         local flightDuration = Constants.BALL_FLIGHT_DURATION
 
         self.Client.OnBallFlying:Fire(player, ball.Name, startPos, targetPos)
+
+		local soundEvent = ReplicatedStorage:FindFirstChild("SoundEvent")
+		if soundEvent then
+			soundEvent:FireClient(player, "shoot")
+		end
 
         local shootSound = mainPart:FindFirstChild("Shoot")
         if shootSound then
@@ -208,8 +220,14 @@ local BallSpawnService = Knit.CreateService({
 
     _DetectGoal = function(self, player, ball, ballData, mainPart, goalChk)
         local dist = (mainPart.Position - goalChk.Position).Magnitude
-        if dist < 15 then
+        if dist < 40 then
             self.Client.OnPlayerGoal:Fire(player, dist)
+
+			local soundEvent = ReplicatedStorage:FindFirstChild("SoundEvent")
+			if soundEvent then
+				soundEvent:FireClient(player, "coins")
+			end
+
             local rewardService = Knit.GetService("RewardService")
             local npcId = "player"
             rewardService:AwardGoal(player, npcId)
