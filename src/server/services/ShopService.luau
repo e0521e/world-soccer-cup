@@ -6,6 +6,9 @@ local Players = game:GetService("Players")
 local Products = require(game:GetService("ReplicatedStorage").Shared.datas.Products)
 local GamePasses = require(game:GetService("ReplicatedStorage").Shared.datas.GamePasses)
 
+local GRANTED = Enum.ProductPurchaseDecision and Enum.ProductPurchaseDecision.PurchaseGranted or 1
+local NOT_PROCESSED = Enum.ProductPurchaseDecision and Enum.ProductPurchaseDecision.NotProcessedYet or 0
+
 local ShopService = Knit.CreateService({
 	Name = "ShopService",
 
@@ -159,27 +162,49 @@ local ShopService = Knit.CreateService({
 	end,
 
 	KnitStart = function(self)
-		MarketplaceService.ProcessReceipt = function(receiptInfo)
+		local function handleReceipt(receiptInfo)
+			if not receiptInfo or not receiptInfo.PurchaseId or not receiptInfo.PlayerId then
+				return NOT_PROCESSED
+			end
+
 			if self._processedReceipts[receiptInfo.PurchaseId] then
-				return Enum.ProductPurchaseDecision.PurchaseGranted
+				return GRANTED
 			end
 
 			local player = Players:GetPlayerByUserId(receiptInfo.PlayerId)
 			if not player then
-				return Enum.ProductPurchaseDecision.NotProcessedYet
+				return NOT_PROCESSED
 			end
 
-			if receiptInfo.PurchaseType == Enum.PurchaseType.Product then
-				local ok = self:_GrantProduct(player, receiptInfo.ProductId)
-				if not ok then
-					return Enum.ProductPurchaseDecision.NotProcessedYet
-				end
-			elseif receiptInfo.PurchaseType == Enum.PurchaseType.GamePass then
-				self:_GrantGamePass(player, receiptInfo.ProductId)
+			local pid = receiptInfo.ProductId
+			if not pid then
+				return NOT_PROCESSED
 			end
 
-			self._processedReceipts[receiptInfo.PurchaseId] = true
-			return Enum.ProductPurchaseDecision.PurchaseGranted
+			local isProduct = false
+			for _, p in ipairs(Products) do
+				if p.ProductId == pid then isProduct = true break end
+			end
+
+			local ok
+			if isProduct then
+				ok = pcall(function() self:_GrantProduct(player, pid) end)
+			else
+				ok = pcall(function() self:_GrantGamePass(player, pid) end)
+			end
+
+			if ok then
+				self._processedReceipts[receiptInfo.PurchaseId] = true
+				return GRANTED
+			end
+			return NOT_PROCESSED
+		end
+
+		local ok, err = pcall(function()
+			MarketplaceService.ProcessReceipt = handleReceipt
+		end)
+		if not ok then
+			warn("ShopService: ProcessReceipt setup failed:", err)
 		end
 
 		Players.PlayerAdded:Connect(function(player)

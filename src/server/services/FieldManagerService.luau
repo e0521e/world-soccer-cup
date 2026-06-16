@@ -12,6 +12,10 @@ local FieldManagerService = Knit.CreateService({
         GetFieldName = function(self, player)
             return self.Server:GetFieldName(player)
         end,
+
+        GetGroundPosition = function(self, player)
+            return self.Server:GetGroundPosition(player)
+        end,
     },
 
     _playerFields = {},
@@ -24,6 +28,17 @@ local FieldManagerService = Knit.CreateService({
     GetFieldName = function(self, player)
         local field = self._playerFields[player]
         return field and field.Name or "none"
+    end,
+
+    GetGroundPosition = function(self, player)
+        local field = self._playerFields[player]
+        if field then
+            local ground = field:FindFirstChild("Ground")
+            if ground then
+                return ground.Position
+            end
+        end
+        return nil
     end,
 
     _AssignField = function(self, player)

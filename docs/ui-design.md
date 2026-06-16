@@ -28,8 +28,9 @@ PlayerGui (Players.LocalPlayer)
      ├─ CoreBar (Frame, 正上居中)
      ├─ InfoBar (Frame, 右上角)
      ├─ ActionPanel (Frame, 右侧居中)
-     │   ├─ ShopButton "🏪 商店"
-     │   └─ RebirthButton "🔄 重生"
+     │   ├─ ShopButton "🏪 Shop"
+     │   ├─ PitchButton "🏟️ Pitch"
+     │   └─ RebirthButton "🔄 Rebirth"
      ├─ GoalOverlay (Frame, 居中, ZIndex=10, 初始隐藏)
      ├─ ToastContainer (Frame, ZIndex=49, 弹出通知)
      └─ ShopOverlay (Frame, 全屏, ZIndex=20, 初始隐藏)
@@ -213,36 +214,35 @@ PlayerGui (Players.LocalPlayer)
 ### 4.1 UI 结构
 
 ```
-CoreBar (Frame, 320×56, 正上居中 y=10)
- ├─ TimerLabel (TextLabel, "00:00", 居中)
- ├─ TrackBg (Frame, 进度条背景, 深色)
- │   ├─ TrackFill (Frame, 渐变色填充, 黄绿橙)
- │   ├─ Dot_1 (Frame, 圆点, 10×10)
- │   ├─ Dot_2 (Frame, 圆点, 10×10)
- │   ├─ Dot_3 (Frame, 圆点, 10×10)
- │   ├─ Dot_4 (Frame, 圆点, 10×10)
- │   ├─ Dot_5 (Frame, 圆点, 10×10)
- │   └─ Dot_6 (Frame, 圆点, 10×10)
+CoreBar (Frame, 860×170, 正上居中 y=6)
+ ├─ TimerLabel (TextLabel, "00:00", TextSize=16, 居中顶部)
+ ├─ Dot_1 ~ Dot_10 (Frame, 50×50 圆角)
+ │   ├─ UICorner (Radius=10)
+ │   ├─ UIStroke (边框，解锁时变金色)
+ │   ├─ ViewportFrame (44×44, RoundCorner)
+ │   │   ├─ WorldModel (NPCHead)
+ │   │   │   └─ Placeholder (Sphere, 1×1×1, 彩色)
+ │   │   ├─ HeadCam (Camera, FOV=30, 对准头部)
+ │   │   └─ VPFLighting
+ │   └─ Name (TextLabel, NPC 名称)
+ ├─ TrackBg (Frame, 760×5, 底部)
+ │   └─ TrackFill (Frame, 绿→金→橙渐变)
 ```
 
-### 4.2 进度逻辑
+### 4.2 Dot 状态
 
-| 元素 | 逻辑 |
-| --- | --- |
-| 总时间 | `ONLINE_TOTAL_MINUTES` × 60 (默认 5 分钟) |
-| 圆点数量 | `ACTIVE_NPC_COUNT` + 1 = 11 个 |
-| 圆点填充间隔 | `NPC_UNLOCK_COUNTDOWN` 秒 (默认 30 秒) |
-| 进度条填充 | `(elapsedSeconds / totalDuration) × 100%` |
-| 渐变色 | 绿 (0%) → 黄 (50%) → 橙 (100%) |
+| 状态 | 圆点底色 | 边框 | VPF 内球颜色 | 名称 |
+| --- | --- | --- | --- | --- |
+| 已解锁 | 深蓝 | 金色 2px | 每个 NPC 独有色 | 白色不透明 |
+| 解锁中 | 暗蓝 | 半透 2px | 灰 | 半透明 |
+| 未解锁 | 深灰 | 高透 1.5px | 深灰 | 高透 |
 
-### 4.3 Dot 状态
+### 4.3 解锁计时
 
-| 状态 | 背景色 | 描边 | Glow |
-| --- | --- | --- | --- |
-| 第一个 (已解锁) | 深蓝 | 半透蓝 | 透明 |
-| 已填充 | 金黄(1,0.85,0.1) | 不透 | 透明 |
-| 当前活跃 | 亮黄(1,1,0.4) | 不透 | 半透发光 |
-| 未填充 | 深灰(0.25,0.25,0.35) | 半透灰 | 透明 |
+- 全部 10 个 NPC 从 0 开始解锁
+- 每 `300/10 = 30s` 解锁一个
+- 前 3 个 NPC CD 同样计入（不预点亮）
+- 第 10 个 NPC 在 t=300s 与进度条同时满
 
 ---
 
@@ -270,9 +270,10 @@ InfoBar (Frame, 150×52, 右上 y=10, x=-162)
 ### 6.1 UI 结构
 
 ```
-ActionPanel (Frame, 110×104, 右侧居中 y=-52)
- ├─ ShopButton "🏪 商店" (绿渐变)
- └─ RebirthButton "🔄 重生" (红渐变)
+ActionPanel (Frame, 110×160, 右侧居中 y=-80)
+ ├─ ShopButton "🏪 Shop" (绿渐变)
+ ├─ PitchButton "🏟️ Pitch" (蓝渐变)
+ └─ RebirthButton "🔄 Rebirth" (红渐变)
 ```
 
 ### 6.2 交互
@@ -280,8 +281,9 @@ ActionPanel (Frame, 110×104, 右侧居中 y=-52)
 | 操作 | 效果 |
 | --- | --- |
 | 鼠标悬停 | 透明度降低，尺寸微增 (0.2s tween) |
-| 点击商店 | 打开 ShopView 覆盖层 |
-| 点击重生 | Toast 提示"功能开发中..."（TODO） |
+| 点击 Shop | 打开 ShopView 覆盖层 |
+| 点击 Pitch | 本地玩家传送到自己场地 `Field_X.Ground` 位置 |
+| 点击 Rebirth | Toast 提示"Coming soon..."（TODO） |
 
 ---
 
@@ -343,6 +345,13 @@ type ToastOptions = {
 3. **可访问性**：所有按钮有足够的点击区域 (44px+)
 4. **反馈**：每个用户操作都有视觉反馈（悬停、点击、状态提示）
 5. **不侵入**：UI 不遮挡核心游戏区域（仅边缘和覆盖层）
+
+### 9.1 字体与特殊字符
+
+- 按钮/标签文本优先使用 **ASCII 安全字符**（A-Z, 0-9, 标点）
+- 非 ASCII 特殊字符（如 Unicode 符号 `✕` `↩` `✔`）在 Roblox 不同字体下 **渲染不稳定**，禁止使用
+- 关闭按钮统一用大写 `X` 代替 `✕`，方向/确认等用文本替代特殊符号
+- Emoji 字符（🪙💰⭐📦🏪🔄）在 Roblox 下渲染可靠，可继续使用
 
 ## 10. 颜色体系
 

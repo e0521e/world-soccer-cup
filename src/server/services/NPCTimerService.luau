@@ -235,17 +235,17 @@ local NPCTimerService = Knit.CreateService({
         elseif qualityData.visualEffect == "jersey" then
             local shirt = npcModel:FindFirstChildOfClass("Shirt")
             if shirt then
-                shirt.Color = Color3.new(1, 0.84, 0)
+                pcall(function() shirt.Color = Color3.new(1, 0.84, 0) end)
             end
         elseif qualityData.visualEffect == "gold" then
             local shirt = npcModel:FindFirstChildOfClass("Shirt")
             if shirt then
-                shirt.Color = Color3.new(1, 0.84, 0)
+                pcall(function() shirt.Color = Color3.new(1, 0.84, 0) end)
             end
         elseif qualityData.visualEffect == "glow" then
             local shirt = npcModel:FindFirstChildOfClass("Shirt")
             if shirt then
-                shirt.Color = Color3.new(1, 0.84, 0)
+                pcall(function() shirt.Color = Color3.new(1, 0.84, 0) end)
             end
             local primary = npcModel:FindFirstChild("HumanoidRootPart")
             if primary then
@@ -258,7 +258,7 @@ local NPCTimerService = Knit.CreateService({
         elseif qualityData.visualEffect == "dynamic" then
             local shirt = npcModel:FindFirstChildOfClass("Shirt")
             if shirt then
-                shirt.Color = Color3.new(1, 0, 0)
+                pcall(function() shirt.Color = Color3.new(1, 0, 0) end)
             end
             local primary = npcModel:FindFirstChild("HumanoidRootPart")
             if primary then
@@ -490,6 +490,19 @@ local NPCTimerService = Knit.CreateService({
     end,
 
     KnitStart = function(self)
+        local npcFolder = game:GetService("ServerStorage"):FindFirstChild("Player")
+        if npcFolder then
+            local displayFolder = Instance.new("Folder")
+            displayFolder.Name = "NPCHeads"
+            displayFolder.Parent = game:GetService("ReplicatedStorage")
+            for _, child in ipairs(npcFolder:GetDescendants()) do
+                if child:IsA("Model") and child:FindFirstChild("Head") then
+                    local clone = child:Clone()
+                    clone.Parent = displayFolder
+                end
+            end
+            print("NPCTimerService: cloned NPC models to ReplicatedStorage.NPCHeads")
+        end
         print("NPCTimerService started")
     end,
 })

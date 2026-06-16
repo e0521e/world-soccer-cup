@@ -224,8 +224,8 @@ return MyController
 | AutoKickService | NPC 寻路最近球（Humanoid:MoveTo）、跑动画、踢动画、球弧线飞行、goal_chk 进球检测 |
 | RewardService | 金币结算、等级管理、NPC 品质管理、DataStore 读写、NPC 解锁 |
 | PlayerService | 玩家会话管理、角色初始化、加入/离开处理 |
-| FieldManagerService | 模板克隆（Folder→Model）、6 场六边形排布（HEX_RADIUS=110，30°起始，60°间隔）、玩家分配/释放、场主标牌绑定 |
-| BallSpawnService | 中场掉球（中心 40×40 区域）、3 球上限、NPC 自动踢检测 |
+| FieldManagerService | 模板克隆（Folder→Model）、6 场六边形排布、玩家分配/释放、返回场地 Ground 坐标（GetGroundPosition） |
+| BallSpawnService | 中场掉球（中心 40×40）、上限 `MAX_BALLS×N`、每轮每人 1 球、NPC 自动踢检测 |
 | NPCProgressService | 在线时间跟踪、进度推流（OnTick/MinuteReached/TeamComplete）、供 UI 轮询 GetElapsedTime |
 | MusicService | 音频播放：按名播放背景音乐/音效、指定父级位置、音量控制 |
 

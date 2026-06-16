@@ -5,7 +5,7 @@
 ### 1.1 基本信息
 
 | 项目 | 内容 |
-| --- | --- |
+| -------- | ------------------ |
 | 游戏名称 | 自由踢球 |
 | 游戏类型 | 半挂机自由踢自动进球（Semi-idle Free Kick Auto-scoring） |
 | 目标平台 | Roblox（PC / 移动端 / 主机） |
@@ -18,7 +18,7 @@
 
 ### 1.3 核心循环
 
-```
+```txt
 10 NPC 预分配 → 3 槽位错开倒计时(60s/120s/180s) → 到期 NPC 自动走向球 → 踢球 → 进球 → 品质 CD 自动再循环 → 槽位补位 (90s CD)
 10 分钟后 10 NPC + 玩家组成踢球队 → 完成大任务
 ```
@@ -35,7 +35,7 @@
 ### 2.2 单场尺寸
 
 | 参数 | 值 |
-| --- | --- |
+| -------- | ------------------- |
 | 场地中心 | (0, 0, 0) 相对模板 |
 | X 轴跨度 | ~116 studs |
 | Z 轴跨度 | ~140 studs |
@@ -53,7 +53,7 @@
 
 ### 3.1 游戏状态机
 
-```
+```txt
 Idle
   │
   ▼
@@ -81,7 +81,7 @@ Coins 增加 → 下一 NPC 倒计时开始
 ### 3.2 NPC 倒计时系统
 
 | 参数 | 值 |
-| --- | --- |
+| -------- | ------------------- |
 | 同时活跃 NPC 数 | 3 |
 | 倒计时范围 | 可配置（例：15~30 秒随机） |
 | 显示方式 | 头顶 BillboardGui |
@@ -113,7 +113,7 @@ NPC 激活后：
 NPC 到达球位置后：
 
 | 参数 | 值 |
-| --- | --- |
+| -------- | ------------------- |
 | 触发方式 | 自动（无需玩家按键） |
 | 动画 | NPC Humanoid 播放预设踢球动画 |
 | 球飞行 | 从当前位置沿弧线飞入球门（~1~2 秒） |
@@ -124,7 +124,7 @@ NPC 到达球位置后：
 唯一球门 `Workspace.Field_1._door` 内含 `goal_chk` 部件：
 
 | 属性 | 值 |
-| --- | --- |
+| -------- | ------------------- |
 | ClassName | Part |
 | 大小 | 2 × 9 × 24 studs |
 | Anchored | true |
@@ -136,7 +136,7 @@ NPC 到达球位置后：
 ### 3.7 奖励发放
 
 | 结果 | 操作 |
-| --- | --- |
+| -------- | ------------------ |
 | 进球 | +Coins、播放进球特效、更新 UI |
 | 未进球 | 球飞出边界后消失，等待下一轮 NPC 循环 |
 | 结算 | Coins 累加到玩家数据并写入 DataStore |
@@ -150,43 +150,62 @@ NPC 到达球位置后：
 每个球模型（`ServerStorage.Ball.ballN`）包含：
 
 | 部件 | 类型 | 说明 |
-| --- | --- | --- |
+| -------- | ------------------------ | --------------------------------- |
 | E_Ball | Part + ProximityPrompt | 触发器部件（保留但非核心交互入口） |
 | Highlight | Highlight | 球体高亮 |
 | Main | MeshPart | 球体主体，size 2×2×2 |
-| Main.Shoot | Sound | 射门音效（×2 个） |
+| Main.Shoot | Sound | 射门音效 |
 | Main.Trail | Trail | 飞行轨迹尾迹 |
-| Main.Attachment1 | Attachment | Trail 起点 |
-| Main.Attachment2 | Attachment | Trail 终点 |
-| Main.Center | Attachment | 球体中心参考点 |
-| Main.gui_bomb | BillboardGui | 球上的炸弹图标 GUI |
 
-### 4.2 Main 部件属性
+### 4.2 球清单
 
-| 属性 | 值 |
-| --- | --- |
-| Size | 2, 2, 2 |
-| MeshId | rbxassetid://433989406 |
-| TextureId | rbxassetid://433989409 |
-| Material | Glass |
-| Massless | true |
-| CollisionGroup | "Ball" |
-| CanCollide | false（飞行中） |
+`ServerStorage.Ball` 下有 45 个球模型（ball1~ball44 + ball422），每次克隆随机取一个。
 
-### 4.3 球清单
+### 4.3 球生成逻辑
 
-`ServerStorage.Ball` 下有 45 个球模型：
+| 参数 | 值 | 说明 |
+| -------- | --------------------------- | --------------------------------- |
+| 生成间隔 | `BALL_SPAWN_INTERVAL = 6` | 每 6 秒检查一次 |
+| 场上上限 | `MAX_BALLS_ON_FIELD × N` | N = 有场地的玩家人数（至少为 1） |
+| 每轮数量 | N 个 | 每个有场地的玩家各生成 1 个球 |
+| 模板来源 | `ServerStorage.Ball` | 随机选一个球模型克隆 |
+| 下落起点 | Y = 50（`BALL_SPAWN_DROP_HEIGHT`） | 高空掉落 |
+| 落地目标 | Y = 1.0（`BALL_LAND_Y`） | 地面高度 |
+| 下落动画 | 1.5s 缓动 | ease-in-out |
+| 落点范围 | 中心 (0,0,0) 周围 40×40 方形区域 | 随机 XZ |
 
-| 球编号 | 数量 | 说明 |
-| --- | --- | --- |
-| ball1 ~ ball44 | 44 | 44 种球 |
-| ball422 | 1 | 额外球 |
+**流程：**
 
-### 4.4 碰撞组
+```txt
+KnitStart 循环 (每 6s)
+  → N = 统计已分配场地的玩家数
+  → maxBalls = MAX_BALLS_ON_FIELD * N
+  → activeBalls.Count < maxBalls ?
+  → 遍历在线玩家，每个有场地者生成 1 个球
+    → ServerStorage.Ball 随机选模板 Clone
+    → 随机 dropPos (XZ ±20, Y=50)
+    → PivotTo(dropPos) → _WaitForLand(ball)
+```
 
-球使用独立碰撞组 `"Ball"`，避免与角色或其他物理对象发生碰撞，仅用于 Touch 检测进球。
+### 4.4 踢球流程
 
----
+球落地后待认领 → 球被使用 → 飞向球门 → 检测进球 → 2s 后销毁。
+
+| 阶段 | 逻辑 | 参数 |
+| ---------- | ---------------------------- | ----------------------------- |
+| 待认领 | 每 0.3s 扫玩家距离 `< 6` | `AUTO_KICK_DISTANCE=6` |
+| 踢球动画 | 播放 NPC 踢球动画，等 1.3s | `KICK_ANIM_TO_FLIGHT_DELAY=1.3` |
+| 球飞行 | 弧线飞向球门后方目标，1.5s | `BALL_FLIGHT_DURATION=1.5`, arcHeight=3~10 |
+| 目标公式 | `target = goalChk + (goalChk.Unit * offset)` | offset = 13~35 random |
+| 进球检测 | 终点距 goal_chk `< 40` → 判进球 | — |
+
+### 4.5 音效
+
+| 时机 | 音效 | SoundId |
+| -------- | -------- | ------------------------------- |
+| 球下落 | Sprint | `rbxassetid://12221842`（TimePosition=1） |
+| 踢球 | shoot | `rbxassetid://8595974357` |
+| 进球 | coins | `rbxassetid://662290183` |
 
 ## 5. 球门系统
 
@@ -203,7 +222,7 @@ NPC 到达球位置后：
 ### 5.2 球门结构
 
 | 部件 | 类型 | 说明 |
-| --- | --- | --- |
+| --------- | ---------------------- | --------------------------- |
 | goal_chk | Part | 透明检测器，2×9×24，Anchored, CanTouch=true |
 | goal | MeshPart / UnionOperation | 球门框主体 |
 | side | Part | 球门侧柱 |
@@ -211,17 +230,19 @@ NPC 到达球位置后：
 
 ### 5.3 进球检测流程
 
-```
+球飞行终点（`targetPos` 在 `goal_chk` 后方 13~35 studs）→ 计算终点 Main 位置与 `goal_chk.Position` 距离 → `< 40` 即判进球：
+
+```txt
 球 Main MeshPart 飞行
       │
       ▼
-goal_chk.Touched 触发
+飞行结束 (elapsed >= 1.5s)
       │
       ▼
-服务器验证球是否处于飞行状态（排除走动碰触）
+计算 Main.Position 与 goal_chk.Position 距离
       │
       ▼
-判定进球 → 发放金币 → 播放特效
+dist < 40 → 进球 → 发放金币 → 播放音效 "coins" → 2s 后销毁球
 ```
 
 ---
@@ -231,6 +252,7 @@ goal_chk.Touched 触发
 ### 6.1 预分配轮转
 
 10 个 NPC 从 `NPCData.luau` 预读（ID 与 `ServerStorage.Player` 子文件夹内模型名精确匹配），按槽位轮转分配：
+
 - 槽 1：NPC 1、4、7、10
 - 槽 2：NPC 2、5、8
 - 槽 3：NPC 3、6、9
@@ -238,7 +260,7 @@ goal_chk.Touched 触发
 ### 6.2 倒计时
 
 | 阶段 | 时长 | 说明 |
-| --- | --- | --- |
+| --------------- | --------------------------- | ---------------------- |
 | 初始启动 | 30s / 60s / 90s（测试） | 错开启动 |
 | 补位 CD | 90s（3×NPC_UNLOCK_COUNTDOWN） | 到期后自动补下一个 |
 | 品质休息 CD | 2~10s（依赖品质） | 踢球后休息 |
@@ -255,7 +277,7 @@ NPC 从 `ServerStorage.Player` 的 4 个子文件夹（Retro/Trending/Popular/Ic
 **品质级别**：
 
 | 级别 | 名称 | 金币倍率 | 外观变化 |
-| --- | --- | -------- | -------- |
+| -------- | ---------------- | ------------ | -------------------------- |
 | 1 | 普通 (Common) | 1.0x | 基础外观 |
 | 2 | 稀有 (Rare) | 1.5x | 球衣颜色变化 |
 | 3 | 史诗 (Epic) | 2.0x | 金色特效 + 专属球衣 |
@@ -265,7 +287,7 @@ NPC 从 `ServerStorage.Player` 的 4 个子文件夹（Retro/Trending/Popular/Ic
 **品质提升方式**：
 
 | 条件 | 效果 |
-| ---- | ---- |
+| --------------- | --------------------------------- |
 | 玩家重生 | 当前活跃 NPC 的品质 +1（上限 5） |
 | 金币购买（可选） | 消耗 Coins 直接提升指定 NPC 品质 |
 
@@ -283,6 +305,7 @@ NPC 从 `ServerStorage.Player` 的 4 个子文件夹（Retro/Trending/Popular/Ic
 ### 7.1 在线进度条
 
 HUD 顶部展示 `FreeKickHUD.HUD.TimeDotContainer`：
+
 - 5 个圆点串联金条，每 60s（测试 30s）点亮一个
 - 时间标签 `MM:SS` 格式，每秒轮询 `NPCProgressService:GetElapsedTime()`
 
@@ -300,7 +323,7 @@ HUD 顶部展示 `FreeKickHUD.HUD.TimeDotContainer`：
 玩家拥有**等级**，通过消耗 Coins 升级。等级影响进球获得的金币数量。
 
 | 等级 | 升级所需 Coins | 进球金币倍率 |
-| --- | ------------- | ----------- |
+| -------- | ------------------ | ---------------- |
 | 1 | 0（初始） | 1.0x |
 | 2 | 200 | 1.2x |
 | 3 | 500 | 1.4x |
@@ -316,12 +339,12 @@ HUD 顶部展示 `FreeKickHUD.HUD.TimeDotContainer`：
 
 ### 8.2 金币计算公式
 
-```
+```txt
 单次进球获得 Coins = BASE_COINS × 等级倍率 × NPC 品质倍率
 ```
 
 | 参数 | 默认值 | 说明 |
-| ---- | ------ | ---- |
+| --------------- | ---------- | ------------------------------------------- |
 | BASE_COINS | 20 | 基础进球金币 |
 | 等级倍率 | 参见 8.1 节 | 由玩家等级决定 |
 | NPC 品质倍率 | 参见 6.4 节 | 由执行射门的 NPC 品质决定 |
@@ -329,7 +352,7 @@ HUD 顶部展示 `FreeKickHUD.HUD.TimeDotContainer`：
 **示例**：
 
 | 玩家等级 | NPC 品质 | 单次进球 Coins |
-| -------- | -------- | ------------- |
+| -------------- | ------------ | ------------------ |
 | 1 (1.0x) | 普通 (1.0x) | 20 × 1.0 × 1.0 = 20 |
 | 5 (1.8x) | 史诗 (2.0x) | 20 × 1.8 × 2.0 = 72 |
 | 10 (3.0x) | 神话 (5.0x) | 20 × 3.0 × 5.0 = 300 |
@@ -338,7 +361,7 @@ HUD 顶部展示 `FreeKickHUD.HUD.TimeDotContainer`：
 
 玩家重生（Respawn）触发成长：
 
-```
+```txt
 玩家死亡/重生
     │
     ▼
@@ -361,17 +384,17 @@ HUD 顶部展示 `FreeKickHUD.HUD.TimeDotContainer`：
 ### 9.1 金币系统
 
 | 参数 | 值 |
-| --- | --- |
+| --------------- | ------------------------------ |
 | 货币名称 | Coins（金币） |
 | 存储方式 | DataStoreService（持久化） |
 
 ### 9.2 DataStore 键
 
 | 数据类型 | 存储键 | 说明 |
-| --- | --- | --- |
+| -------------- | ------------------- | --------------------- |
 | Coins | PlayerCoins | 玩家金币余额 |
 | PlayerLevel | PlayerLevel | 当前等级 |
-| NPCQuality | NPCQuality_<npcId> | 各 NPC 的品质等级 |
+| NPCQuality | NPCQuality_[npcId] | 各 NPC 的品质等级 |
 | UnlockedCharacters | UnlockedChars | 已解锁球星 ID 列表 |
 
 ---
@@ -385,7 +408,7 @@ HUD 顶部展示 `FreeKickHUD.HUD.TimeDotContainer`：
 ### 10.2 球星解锁
 
 | 状态 | 操作 |
-| --- | --- |
+| --------------- | --------------------- |
 | 默认可用 | 1~3 位基础球星（如 Messi, Ronaldo, Neymar） |
 | 金币解锁 | 消耗 Coins 解锁其他球星 |
 | 选择方式 | 通过 UI 角色选择界面 |
@@ -393,7 +416,7 @@ HUD 顶部展示 `FreeKickHUD.HUD.TimeDotContainer`：
 ### 10.3 解锁费用
 
 | 球星范围 | 解锁费用 |
-| --- | --- |
+| --------------- | ------------- |
 | 基础（默认） | 0 |
 | 明星（4~12） | 各 500 Coins |
 | 传奇（13~24） | 各 1000 Coins |
@@ -420,7 +443,7 @@ HUD 顶部展示 `FreeKickHUD.HUD.TimeDotContainer`：
 ### 11.2 进球反馈
 
 | 元素 | 说明 |
-| --- | --- |
+| --------------- | ------------------------------------- |
 | 屏幕特效 | 进球闪光 + "Goal!" 文字 + Coins 数额 |
 | 音效 | 进球欢呼声（品质越高音效越丰富） |
 | 金币弹出 | +XX Coins 浮字动画（含倍率提示） |
@@ -429,7 +452,7 @@ HUD 顶部展示 `FreeKickHUD.HUD.TimeDotContainer`：
 ### 11.3 角色选择界面
 
 | 元素 | 说明 |
-| --- | --- |
+| --------------- | ----------------------------- |
 | 球星网格 | 显示所有 24 位球星头像/名称/品质星级 |
 | 锁定状态 | 已解锁 vs 未解锁（显示价格） |
 | 选中高亮 | 当前使用的球星有边框标识 |
@@ -439,7 +462,7 @@ HUD 顶部展示 `FreeKickHUD.HUD.TimeDotContainer`：
 ### 11.4 升级界面
 
 | 元素 | 说明 |
-| --- | --- |
+| --------------- | ----------------------------- |
 | 当前等级 | 显示玩家等级及下一级所需 Coins |
 | 升级按钮 | 消耗 Coins 升级，显示升级后收益 |
 | 倍率预览 | 显示升级后各 NPC 进球金币变化 |
@@ -451,7 +474,7 @@ HUD 顶部展示 `FreeKickHUD.HUD.TimeDotContainer`：
 ### 12.1 Knit 框架
 
 | 层级 | 技术 | 路径 |
-| --- | --- | --- |
+| -------- | --------------- | --------------------------------------------------- |
 | 框架 | Knit v1.7.0 | ReplicatedStorage.Packages.Knit |
 | Component | Component v2.4.8 | ReplicatedStorage.Packages.Component |
 | 服务端 | ServerScriptService.Server | `Knit.AddServicesDeep(script.services)` → `Knit.Start()` |
@@ -460,7 +483,7 @@ HUD 顶部展示 `FreeKickHUD.HUD.TimeDotContainer`：
 ### 12.2 服务层设计
 
 | 服务 | 职责 |
-| --- | --- |
+| ------------------- | ----------------------------------------------------------- |
 | BallService | 球管理、球飞行 tween、球回收 |
 | GoalService | 进球检测（goal_chk.Touched）、进球判定 |
 | NPCSchedulerService | NPC 选取、倒计时管理、激活/切换逻辑 |
@@ -471,7 +494,7 @@ HUD 顶部展示 `FreeKickHUD.HUD.TimeDotContainer`：
 ### 12.3 控制器层设计
 
 | 控制器 | 职责 |
-| --- | --- |
+| ------------------ | -------------------------------------------------------- |
 | UIController | HUD 显示（等级、金币、倒计时）、升级界面、进球反馈、角色选择界面 |
 | CameraController | 吃球员及射球时镜头切换/跟随 |
 | NPCTimerController | 头顶倒计时 BillboardGui 更新 |
@@ -479,7 +502,7 @@ HUD 顶部展示 `FreeKickHUD.HUD.TimeDotContainer`：
 ### 12.4 工具依赖
 
 | 包 | 用途 |
-| --- | --- |
+| ----------- | ---------------- |
 | Knit | 服务/控制器框架 |
 | Component | 面向对象组件系统 |
 | Loader | 模块加载管理 |
@@ -500,10 +523,10 @@ HUD 顶部展示 `FreeKickHUD.HUD.TimeDotContainer`：
 ### 12.5 数据存储
 
 | 数据类型 | 存储键 | 说明 |
-| --- | --- | --- |
+| -------------- | ------------------- | --------------------- |
 | Coins | PlayerCoins | 玩家金币余额 |
 | PlayerLevel | PlayerLevel | 当前等级 |
-| NPCQuality | NPCQuality_<npcId> | 各 NPC 的品质等级（1~5） |
+| NPCQuality | NPCQuality_[npcId] | 各 NPC 的品质等级（1~5） |
 | UnlockedCharacters | UnlockedChars | 已解锁球星 ID 列表 |
 
 ---
@@ -547,7 +570,7 @@ HUD 顶部展示 `FreeKickHUD.HUD.TimeDotContainer`：
 所有音频资源放置在 `SoundService` 下，不通过 Rojo 管理，直接在 Studio 中手动放置：
 
 | 容器 | 类型 | 说明 |
-| --- | --- | --- |
+| ----------------------------- | ------------ | -------------------------------- |
 | `SoundService.MusicGroup` | SoundGroup | 背景音乐，当前仅 `BGM_lobby` |
 | `SoundService.SoundGroup` | SoundGroup | 游戏音效，含进球、拾取、冲刺、踢球等 |
 

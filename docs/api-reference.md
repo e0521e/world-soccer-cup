@@ -206,6 +206,7 @@
 | 方法 | 参数 | 返回值 | 权限 | 说明 |
 | ---- | ---- | ------ | ---- | ---- |
 | GetFieldName | `()` | `string` | Client | 获取分配的场名 |
+| GetGroundPosition | `()` | `Vector3?` | Client | 获取当前场地 Ground 部件坐标（Pitch 按钮传送） |
 
 #### 1.5.2 内部方法
 

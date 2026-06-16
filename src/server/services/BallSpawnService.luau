@@ -51,6 +51,17 @@ local BallSpawnService = Knit.CreateService({
             (math.random() - 0.5) * 40
         )
 
+        local areaBall = field:FindFirstChild("AreaBall")
+        if areaBall and areaBall:IsA("BasePart") then
+            local cp = areaBall.Position
+            local cs = areaBall.Size
+            dropPos = Vector3.new(
+                cp.X + (math.random() - 0.5) * cs.X,
+                Constants.BALL_SPAWN_DROP_HEIGHT,
+                cp.Z + (math.random() - 0.5) * cs.Z
+            )
+        end
+
         ball:PivotTo(CFrame.new(dropPos))
 
         local highlight = ball:FindFirstChildWhichIsA("Highlight")
@@ -171,10 +182,9 @@ local BallSpawnService = Knit.CreateService({
         if not goalChk then return end
 
         local gPos = goalChk.Position
-        local gPos = goalChk.Position
         local gSize = goalChk.Size
         local toGoal = Vector3.new(gPos.X, 0, gPos.Z).Unit
-        local offsetDist = gSize.Z / 2 + 1 + math.random() * (gSize.Z - 2)
+        local offsetDist = 2 + math.random() * 8
         local targetPos = Vector3.new(
             gPos.X + toGoal.X * offsetDist,
             Constants.BALL_LAND_Y + 0.1,
@@ -182,7 +192,7 @@ local BallSpawnService = Knit.CreateService({
         )
         local mainPart = ballData.mainPart
         local startPos = mainPart.Position
-        local arcHeight = 15
+        local arcHeight = math.random(Constants.BALL_ARC_MIN, Constants.BALL_ARC_MAX)
         local flightDuration = Constants.BALL_FLIGHT_DURATION
 
         self.Client.OnBallFlying:Fire(player, ball.Name, startPos, targetPos)
@@ -276,18 +286,25 @@ local BallSpawnService = Knit.CreateService({
         task.spawn(function()
             while true do
                 task.wait(Constants.BALL_SPAWN_INTERVAL)
+                local players = game:GetService("Players"):GetPlayers()
+                local activeFieldCount = 0
+                for _, player in ipairs(players) do
+                    if fieldMgr:GetField(player) then
+                        activeFieldCount += 1
+                    end
+                end
+                local maxBalls = Constants.MAX_BALLS_ON_FIELD * math.max(activeFieldCount, 1)
+
                 local totalBalls = 0
                 for _ in pairs(self._activeBalls) do
                     totalBalls += 1
                 end
-                if totalBalls < Constants.MAX_BALLS_ON_FIELD then
-                    local players = game:GetService("Players"):GetPlayers()
-                    for _, player in ipairs(players) do
-                        local field = fieldMgr:GetField(player)
-                        if field then
-                            self:SpawnBall(field)
-                            break
-                        end
+                if totalBalls >= maxBalls then continue end
+
+                for _, player in ipairs(players) do
+                    local field = fieldMgr:GetField(player)
+                    if field then
+                        self:SpawnBall(field)
                     end
                 end
             end

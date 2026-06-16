@@ -2,11 +2,13 @@
 
 local Constants = {
     BASE_COINS = 20,                -- 每次进球的基础金币（计算前）
-    ACTIVE_NPC_COUNT = 10,          -- 队伍总 NPC 数量（10 分钟逐步解锁）
+    ACTIVE_NPC_COUNT = 10,          -- 队伍总 NPC 数量（逐步解锁）
     FIELD_NPC_SLOTS = 3,            -- 场上同时可见的等待插槽数
     COUNTDOWN_MIN = 15,             -- (已废弃，改用品质 cd)
     COUNTDOWN_MAX = 30,             -- (已废弃，改用品质 cd)
     BALL_FLIGHT_DURATION = 1.5,     -- 球飞行弧线时长（秒）
+    BALL_ARC_MIN = 3,               -- 球飞行弧线最小高度（studs）
+    BALL_ARC_MAX = 10,              -- 球飞行弧线最大高度（studs）
     MAX_NPC_QUALITY = 5,            -- NPC 品质上限（1-5 级）
     DATASTORE_KEY = "PlayerData_",  -- DataStore 存储键前缀
     BALL_SPAWN_INTERVAL = 6,        -- 掉球间隔（秒）
@@ -19,7 +21,7 @@ local Constants = {
     NPC_KICK_ANIM_ID = "rbxassetid://129320048058024", -- NPC 踢球动画 ID
     KICK_ANIM_TO_FLIGHT_DELAY = 1.3,   -- 踢球动画播放后到球飞行的延迟（秒），供人工调整
     ONLINE_TOTAL_MINUTES = 5,       -- 在线进度总时长（分钟）- 测试阶段减半
-    NPC_UNLOCK_COUNTDOWN = 30,      -- 新 NPC 出现在场上的倒计时（秒）- 测试阶段减半
+    NPC_UNLOCK_COUNTDOWN = 30,      -- NPC 槽位初始倒计时（秒）
 }
 
 return Constants

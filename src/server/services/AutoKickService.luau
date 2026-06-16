@@ -132,7 +132,7 @@ local AutoKickService = Knit.CreateService({
         local gPos = goalChk.Position
 		local gSize = goalChk.Size
 		local toGoal = Vector3.new(gPos.X, 0, gPos.Z).Unit
-		local offsetDist = gSize.Z / 2 + 1 + math.random() * (gSize.Z - 2)
+		local offsetDist = 2 + math.random() * 8
 		local targetPos = Vector3.new(
 			gPos.X + toGoal.X * offsetDist,
 			Constants.BALL_LAND_Y + 0.1,
@@ -158,9 +158,9 @@ local AutoKickService = Knit.CreateService({
         end
 
         local flightDuration = Constants.BALL_FLIGHT_DURATION
-        local arcHeight = 15
-
         local startPos = mainPart.Position
+        local arcHeight = math.random(Constants.BALL_ARC_MIN, Constants.BALL_ARC_MAX)
+
         local midPos = (startPos + targetPos) / 2 + Vector3.new(0, arcHeight, 0)
 
         local flightInfo = TweenInfo.new(

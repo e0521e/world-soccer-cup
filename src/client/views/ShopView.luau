@@ -63,7 +63,7 @@ function ShopView.new(screenGui: Instance)
 	closeBtn.TextColor3 = Color3.new(1, 1, 1)
 	closeBtn.TextScaled = true
 	closeBtn.Font = Enum.Font.GothamBold
-	closeBtn.Text = "✕"
+	closeBtn.Text = "X"
 	closeBtn.BorderSizePixel = 0
 	closeBtn.ZIndex = 30
 	closeBtn.Parent = panel

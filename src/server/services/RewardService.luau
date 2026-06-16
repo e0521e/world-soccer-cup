@@ -55,16 +55,15 @@ local RewardService = Knit.CreateService({
 
     GetLevel = function(self, player)
         local data = self._playerData[player]
-        if not data then return { level = 1, multiplier = 1.0, nextCost = 0 } end
+        if not data then return { level = 1, multiplier = 1.0, nextCost = 0, loaded = false } end
 
         local level = data.Level
-        local levelConfig = PlayerLevels[level] or PlayerLevels[#PlayerLevels]
-        local nextConfig = PlayerLevels[level + 1]
-
+        local config = PlayerLevels[level] or PlayerLevels[1]
         return {
             level = level,
-            multiplier = levelConfig.multiplier,
-            nextCost = nextConfig and nextConfig.cost or 0,
+            multiplier = config.multiplier,
+            nextCost = config.upgradeCost,
+            loaded = true,
         }
     end,
 
@@ -147,7 +146,6 @@ local RewardService = Knit.CreateService({
         if not data then return end
         data.Coins += amount
         self.Client.OnCoinsChanged:Fire(player, data.Coins, amount)
-        self:_SaveData(player)
     end,
 
     AwardGoal = function(self, player, npcId)
@@ -169,7 +167,6 @@ local RewardService = Knit.CreateService({
 
         data.Coins += coins
         self.Client.OnCoinsChanged:Fire(player, data.Coins, coins)
-        self:_SaveData(player)
     end,
 
     UpgradeNPCQuality = function(self, player, npcId)
@@ -184,7 +181,6 @@ local RewardService = Knit.CreateService({
 
         local qualityConfig = NPCData.QualityTiers[newQuality]
         self.Client.OnNPCQualityUp:Fire(player, npcId, newQuality, qualityConfig.multiplier)
-        self:_SaveData(player)
     end,
 
     LoadPlayerData = function(self, player)
@@ -227,7 +223,7 @@ local RewardService = Knit.CreateService({
 
         local now = tick()
         local last = self._lastSave[player] or 0
-        if not force and (now - last) < 15 then return end
+        if not force and (now - last) < 60 then return end
         self._lastSave[player] = now
 
         local userId = player.UserId
