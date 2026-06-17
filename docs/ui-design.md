@@ -37,7 +37,7 @@ PlayerGui (Players.LocalPlayer)
          └─ ShopPanel (Frame, 居中)
              ├─ CloseBtn (TextButton)
              ├─ Title "🏪 商店"
-             ├─ CoinsLabel "💰 XXXX"
+             ├─ CoinsLabel "💵 XXXX"
              ├─ TabBar
              │   ├─ ProductsTab "📦 商品"
              │   └─ GamePassesTab "⭐ 特权"
@@ -95,17 +95,17 @@ PlayerGui (Players.LocalPlayer)
 │                                                    │
 │          ┌──────────────────────────────┐          │
 │          │      🏪 商店             ✕   │          │
-│          │  💰 1500                     │          │
+│          │  💵 1500                     │          │
 │          │  ┌──────┐ ┌──────┐          │          │
 │          │  │📦商品│ │⭐特权│          │          │
 │          │  └──────┘ └──────┘          │          │
 │          │                              │          │
 │          │  ┌────────────────────────┐  │          │
 │          │  │ 🔷  │ Double Coins     │  │          │
-│          │  │      │ 2x 进球金币   🪙2000 [购买]│  │
+│          │  │      │ 2x 进球金币   💵2000 [购买]│  │
 │          │  ├────────────────────────┤  │          │
 │          │  │ ❤️‍🔥│ Extra Stamina    │  │          │
-│          │  │      │ 200 最大体力 🪙1500 [购买]│  │
+│          │  │      │ 200 最大体力 💵1500 [购买]│  │
 │          │  └────────────────────────┘  │          │
 │          │                              │          │
 │          │       [状态提示文字]         │          │
@@ -129,7 +129,7 @@ PlayerGui (Players.LocalPlayer)
 | Tab | 按钮文本 | 数据源 | 购买货币 |
 | --- | --- | --- | --- |
 | Products | "📦 商品" | `Products.luau` | 💎 Robux |
-| GamePasses | "⭐ 特权" | `GamePasses.luau` | 🪙 Coins / 💎 Robux |
+| GamePasses | "⭐ 特权" | `GamePasses.luau` | 💵 Coins / 💎 Robux |
 
 ### 3.4 ItemCard 设计
 
@@ -137,7 +137,7 @@ PlayerGui (Players.LocalPlayer)
 
 ```
 ┌─────────────────────────────────────────────────┐
-│ ┌────┐  Double Coins                    🪙 2000 │
+│ ┌────┐  Double Coins                    💵 2000 │
 │ │ 🔷 │  Earn 2x coins from goals      [购买]   │
 │ └────┘                                           │
 └─────────────────────────────────────────────────┘
@@ -150,7 +150,7 @@ PlayerGui (Players.LocalPlayer)
 | 图标区域 | 44 × 44 px，圆角 8 px |
 | 名称 | 左侧，粗体，白色 |
 | 描述 | 名称下方，灰色 `(0.7, 0.7, 0.85)` |
-| 价格 | 右上，金色（🪙）或蓝色（💎） |
+| 价格 | 右上，金色（💵）或蓝色（💎） |
 | 购买按钮 | 右下，70 × 28 px，圆角 6 px |
 
 ### 3.5 购买流程
@@ -252,7 +252,7 @@ CoreBar (Frame, 860×170, 正上居中 y=6)
 
 ```
 InfoBar (Frame, 150×52, 右上 y=10, x=-162)
- ├─ CoinsLabel "💰 0"
+ ├─ CoinsLabel "💵 0"
  └─ LevelLabel "Lv.1 (x1.0)"
 ```
 
@@ -260,7 +260,7 @@ InfoBar (Frame, 150×52, 右上 y=10, x=-162)
 
 | 标签 | 内容格式 | 更新触发 |
 | --- | --- | --- |
-| CoinsLabel | `💰 {coins}` | 每秒轮询 |
+| CoinsLabel | `💵 {coins}` | 每秒轮询 |
 | LevelLabel | `Lv.{level} (x{multiplier})` | 仅等级变化时 |
 
 ---
@@ -329,7 +329,7 @@ type ToastOptions = {
 | 进球 | ⚽ | GOAL! | — |
 | 球队完成 | 🏆 | 踢球队完成! | — |
 | 升级 | ⬆ | LEVEL UP! | Lv.2 (x1.5) |
-| 金币获得 | 🪙 | +50 Coins | — |
+| 金币获得 | 💵 | +50 Coins | — |
 | NPC 解锁 | 🎉 | Lionel Messi 已解锁! | 品质: Rare |
 | NPC 就绪 | ⏳ | {name} | 将在 X 秒后准备就绪 |
 | NPC 可认领 | ✅ | {name} | 已就绪! 按 E 认领 |
@@ -351,7 +351,7 @@ type ToastOptions = {
 - 按钮/标签文本优先使用 **ASCII 安全字符**（A-Z, 0-9, 标点）
 - 非 ASCII 特殊字符（如 Unicode 符号 `✕` `↩` `✔`）在 Roblox 不同字体下 **渲染不稳定**，禁止使用
 - 关闭按钮统一用大写 `X` 代替 `✕`，方向/确认等用文本替代特殊符号
-- Emoji 字符（🪙💰⭐📦🏪🔄）在 Roblox 下渲染可靠，可继续使用
+- Emoji 字符（💵💵⭐📦🏪🔄）在 Roblox 下渲染可靠，可继续使用
 
 ## 10. 颜色体系
 

@@ -201,6 +201,11 @@ local AutoKickService = Knit.CreateService({
         if scored then
             self.Client.OnGoalScored:Fire(player, slotData.slotId, slotData.npcId)
 
+			local coinEvent = ReplicatedStorage:FindFirstChild("CoinEffectEvent")
+			if coinEvent then
+				coinEvent:FireClient(player, mainPart.Position)
+			end
+
 			if self._soundEvent then
 				self._soundEvent:FireClient(player, "coins")
 			end
@@ -229,6 +234,11 @@ local AutoKickService = Knit.CreateService({
 		self._soundEvent = Instance.new("RemoteEvent")
 		self._soundEvent.Name = "SoundEvent"
 		self._soundEvent.Parent = ReplicatedStorage
+
+		local coinEvent = Instance.new("RemoteEvent")
+		coinEvent.Name = "CoinEffectEvent"
+		coinEvent.Parent = ReplicatedStorage
+
         print("AutoKickService started")
     end,
 })

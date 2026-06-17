@@ -56,7 +56,6 @@ local PlayerService = Knit.CreateService({
         if not npcModel then return end
 
         self._playerSlots[player] = slotData
-        self.Client.OnTakeover:Fire(player, slotData.slotId, slotData.npcId)
 
         local autoKickService = Knit.GetService("AutoKickService")
         autoKickService:ExecuteKick(player, npcModel, slotData)
@@ -118,6 +117,40 @@ local PlayerService = Knit.CreateService({
     end,
 
     KnitStart = function(self)
+        task.spawn(function()
+            local trophyModel = workspace:FindFirstChild("trophy")
+            local trophyPart = trophyModel and trophyModel:FindFirstChild("Main")
+            local prompt = trophyPart and trophyPart:FindFirstChild("WorldCupPrompt")
+            if prompt and prompt:IsA("ProximityPrompt") then
+                prompt.Triggered:Connect(function(player)
+                    local rewardService = Knit.GetService("RewardService")
+                    local unlocked = rewardService:GetUnlockedNPCs(player)
+                    if #unlocked < Constants.WORLD_CUP_REQUIRED_NPCS then
+                        local noticeEvent = game:GetService("ReplicatedStorage"):FindFirstChild("UpgradeNoticeEvent")
+                        if noticeEvent then
+                            noticeEvent:FireClient(player, "WorldCupNeedTeam")
+                        end
+                        return
+                    end
+
+                    local noticeEvent = game:GetService("ReplicatedStorage"):FindFirstChild("UpgradeNoticeEvent")
+                    if noticeEvent then
+                        noticeEvent:FireClient(player, "WorldCupStart")
+                    end
+
+                    local delay = math.random(11, 20)
+                    task.wait(delay)
+
+                    rewardService._playerData[player].Trophies += 1
+                    rewardService:_SaveData(player, true)
+
+                    if noticeEvent then
+                        noticeEvent:FireClient(player, "WorldCupDone")
+                    end
+                end)
+            end
+        end)
+
         game:GetService("Players").PlayerAdded:Connect(function(player)
             self._playerSlots[player] = nil
             self:_setupRespawn(player)

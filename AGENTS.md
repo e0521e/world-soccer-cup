@@ -20,10 +20,10 @@
 ## UI 显示规范
 
 - 所有 UI 展示文本统一使用英文（包括 Title、Button、Label、Toast、StatusBar 等）
-- 游戏内货币符号：Coins 使用 `🪙`，Robux 使用 `utf8.char(0xE002)`
+- 游戏内货币符号：Coins 使用 `💵`，Robux 使用 `utf8.char(0xE002)`
 - 避免使用中文 UI 文本，错误消息、提示、按钮文字、状态栏等均用英文
 - **禁止使用非 ASCII 特殊字符**（如 `✕` `✔` `↩`），在 Roblox 不同字体下渲染不稳定，用 ASCII 替代（关闭按钮用 `X`）
-- Emoji 字符（🪙💰⭐📦🏪🔄）渲染可靠，可继续使用
+- Emoji 字符（💵💵⭐📦🏪🔄）渲染可靠，可继续使用
 
 ## AI 工作原则
 

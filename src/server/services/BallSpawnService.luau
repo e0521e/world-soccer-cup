@@ -233,6 +233,11 @@ local BallSpawnService = Knit.CreateService({
         if dist < 40 then
             self.Client.OnPlayerGoal:Fire(player, dist)
 
+			local coinEvent = ReplicatedStorage:FindFirstChild("CoinEffectEvent")
+			if coinEvent then
+				coinEvent:FireClient(player, mainPart.Position)
+			end
+
 			local soundEvent = ReplicatedStorage:FindFirstChild("SoundEvent")
 			if soundEvent then
 				soundEvent:FireClient(player, "coins")

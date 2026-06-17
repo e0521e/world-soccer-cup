@@ -271,7 +271,7 @@ ScreenGui
 | 进球 | ⚽ | GOAL! | — |
 | 球队完成 | 🏆 | 踢球队完成! | — |
 | 升级 | ⬆ | LEVEL UP! | Lv.2 (x1.5) |
-| 金币获得 | 🪙 | +50 Coins | — |
+| 金币获得 | 💵 | +50 Coins | — |
 | NPC 解锁 | 🎉 | Lionel Messi 已解锁! | 品质: <font color="gold">Rare</font> |
 | 提示信息 | ℹ | — | 按 <b>E</b> 与 NPC 交互 |
 

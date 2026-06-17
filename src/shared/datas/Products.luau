@@ -6,7 +6,7 @@ local Products = {
 		PriceRobux = 99,
 		PriceCoins = 0,
 		Rewards = { Coins = 500 },
-		Icon = "💰",
+		Icon = "💵",
 	},
 	{
 		ProductId = 3528485301,
@@ -15,7 +15,7 @@ local Products = {
 		PriceRobux = 299,
 		PriceCoins = 0,
 		Rewards = { Coins = 1500 },
-		Icon = "💰",
+		Icon = "💵",
 	},
 	{
 		ProductId = 3528485307,
@@ -24,7 +24,7 @@ local Products = {
 		PriceRobux = 999,
 		PriceCoins = 0,
 		Rewards = { Coins = 5000 },
-		Icon = "💰",
+		Icon = "💵",
 	},
 }
 

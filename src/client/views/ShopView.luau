@@ -96,7 +96,7 @@ function ShopView.new(screenGui: Instance)
 	coinsLabel.TextScaled = true
 	coinsLabel.Font = Enum.Font.GothamBold
 	coinsLabel.TextXAlignment = Enum.TextXAlignment.Left
-	coinsLabel.Text = "💰 0"
+	coinsLabel.Text = "💵 0"
 	coinsLabel.ZIndex = 30
 	coinsLabel.Parent = panel
 	self._coinsLabel = coinsLabel
@@ -260,7 +260,7 @@ end
 function ShopView:UpdateCoinsDisplay()
 	local rewardService = Knit.GetService("RewardService")
 	local coins = rewardService:GetCoins()
-	self._coinsLabel.Text = "💰 " .. tostring(math.floor(coins))
+	self._coinsLabel.Text = "💵 " .. tostring(math.floor(coins))
 end
 
 function ShopView:SwitchTab(tab: string)
@@ -412,7 +412,7 @@ function ShopView:_CreateItemCard(item: any, itemType: string, isOwned: boolean?
 		local priceRobux = item.PriceRobux or 0
 
 		if priceCoins > 0 then
-			self:_CreateBuyButton(card, item, itemType, priceCoins, "🪙")
+			self:_CreateBuyButton(card, item, itemType, priceCoins, "💵")
 		elseif priceRobux > 0 then
 			self:_CreateBuyButton(card, item, itemType, priceRobux, utf8.char(0xE002))
 		end
@@ -425,7 +425,7 @@ function ShopView:_CreateBuyButton(card: Frame, item: any, itemType: string, pri
 	priceLabel.Size = UDim2.new(0, 70, 0, 22)
 	priceLabel.Position = UDim2.new(1, -156, 0, 25)
 	priceLabel.BackgroundTransparency = 1
-	priceLabel.TextColor3 = if currencyIcon == "🪙" then Color3.new(1, 0.9, 0.1) else Color3.new(0.6, 0.8, 1)
+	priceLabel.TextColor3 = if currencyIcon == "💵" then Color3.new(1, 0.9, 0.1) else Color3.new(0.6, 0.8, 1)
 	priceLabel.TextScaled = true
 	priceLabel.Font = Enum.Font.GothamBold
 	priceLabel.TextXAlignment = Enum.TextXAlignment.Right
@@ -437,7 +437,7 @@ function ShopView:_CreateBuyButton(card: Frame, item: any, itemType: string, pri
 	buyBtn.Name = "BuyBtn"
 	buyBtn.Size = UDim2.new(0, 70, 0, 28)
 	buyBtn.Position = UDim2.new(1, -82, 0, 22)
-	buyBtn.BackgroundColor3 = if currencyIcon == "🪙" then Color3.new(0.8, 0.6, 0.05) else Color3.new(0.1, 0.35, 0.6)
+	buyBtn.BackgroundColor3 = if currencyIcon == "💵" then Color3.new(0.8, 0.6, 0.05) else Color3.new(0.1, 0.35, 0.6)
 	buyBtn.BackgroundTransparency = 0.15
 	buyBtn.TextColor3 = Color3.new(1, 1, 1)
 	buyBtn.TextScaled = true
@@ -465,7 +465,7 @@ function ShopView:_CreateBuyButton(card: Frame, item: any, itemType: string, pri
 				task.delay(3, function() self._statusBar.Text = "" end)
 				return
 			end
-			if currencyIcon == "🪙" then
+			if currencyIcon == "💵" then
 				local success, err = shopService:PurchaseWithCoins(item.GamePassId)
 				if success then
 					self._statusBar.Text = "✅ " .. item.Name .. " purchased!"

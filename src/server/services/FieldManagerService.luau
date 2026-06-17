@@ -2,6 +2,7 @@
 
 local Knit = require(game:GetService("ReplicatedStorage").Packages.Knit)
 local ServerStorage = game:GetService("ServerStorage")
+local Players = game:GetService("Players")
 
 local MAX_FIELDS = 6
 
@@ -46,6 +47,7 @@ local FieldManagerService = Knit.CreateService({
             local field = table.remove(self._freeFields)
             self._playerFields[player] = field
             self:_UpdatePlayerGuis(field, player)
+            self:_SetupLevelUpZone(field, player)
             print("FieldManagerService: assigned " .. field.Name .. " to " .. player.Name)
             return field
         end
@@ -63,6 +65,153 @@ local FieldManagerService = Knit.CreateService({
             end
             print("FieldManagerService: released " .. field.Name .. " from " .. player.Name)
         end
+    end,
+
+    _SetupLevelUpZone = function(self, field, player)
+        local zone = field:FindFirstChild("Zone_LevelUp")
+        if not zone then print("Zone_LevelUp not found in", field.Name); return end
+
+        print("Zone_LevelUp found in", field.Name, "for", player.Name)
+
+        local rewardService = Knit.GetService("RewardService")
+
+        task.spawn(function()
+            local levelInfo
+            for _ = 1, 20 do
+                levelInfo = rewardService:GetLevel(player)
+                if levelInfo.loaded then break end
+                task.wait(0.5)
+            end
+            print("Level info for", player.Name, ":", levelInfo.level, levelInfo.nextCost)
+            local info = zone:FindFirstChild("info")
+            if info then
+                local gui = info:FindFirstChild("Gui")
+                if gui then
+                    local tPrice = gui:FindFirstChild("t_price")
+                    if tPrice and tPrice:IsA("TextLabel") then
+                        tPrice.Text = "💵" .. tostring(levelInfo.nextCost)
+                        print("t_price set to", tPrice.Text)
+                    else
+                        print("t_price not found")
+                    end
+                else
+                    print("Gui not found in info")
+                end
+            else
+                print("info not found in Zone_LevelUp")
+            end
+        end)
+
+        local mainPart = zone:IsA("BasePart") and zone or zone:FindFirstChildWhichIsA("BasePart")
+        if not mainPart then print("No BasePart in Zone_LevelUp"); return end
+
+        print("Touch connected on", mainPart.Name)
+
+        local cd = false
+        mainPart.Touched:Connect(function(hit)
+            if cd then return end
+            if hit.Name ~= "HumanoidRootPart" then return end
+            local char = hit.Parent
+            local humanoid = char and char:FindFirstChildWhichIsA("Humanoid")
+            if not humanoid then return end
+            local touchingPlayer = Players:GetPlayerFromCharacter(char)
+            if not touchingPlayer or touchingPlayer ~= player then return end
+
+            cd = true
+            task.delay(3, function() cd = false end)
+
+            local data = rewardService._playerData[player]
+            local level = data and data.Level or 1
+            local nextConfig = require(game:GetService("ReplicatedStorage").Shared.configs.PlayerLevels)[level + 1]
+            if not nextConfig then
+                print("Already max level")
+                self:_NotifyPlayer(player, "Max Level")
+                return
+            end
+
+            local coins = data and data.Coins or 0
+            print("Player coins:", coins, "required:", nextConfig.cost)
+
+            if coins < nextConfig.cost then
+                print("Not enough coins")
+                self:_NotifyPlayer(player, "NotEnough")
+                return
+            end
+
+            local success = rewardService:UpgradeLevel(player)
+            print("Upgrade result:", success)
+            if success then
+                self:_NotifyPlayer(player, "Success")
+                self:_PlayUpgradeEffect(mainPart)
+                local newLevelInfo = rewardService:GetLevel(player)
+                local info = zone:FindFirstChild("info")
+                if info then
+                    local gui = info:FindFirstChild("Gui")
+                    if gui then
+                        local tPrice = gui:FindFirstChild("t_price")
+                        if tPrice and tPrice:IsA("TextLabel") then
+                            tPrice.Text = "💵" .. tostring(newLevelInfo.nextCost)
+                            print("t_price updated to", tPrice.Text)
+                        end
+                    end
+                end
+            end
+        end)
+    end,
+
+    _NotifyPlayer = function(self, player, messageType)
+        local event = game:GetService("ReplicatedStorage"):FindFirstChild("UpgradeNoticeEvent")
+        if event then
+            event:FireClient(player, messageType)
+        end
+    end,
+
+    _PlayUpgradeEffect = function(self, part)
+        local attachment = Instance.new("Attachment")
+        attachment.Parent = part
+
+        local emitter = Instance.new("ParticleEmitter")
+        emitter.Parent = attachment
+        emitter.Texture = "rbxasset://textures/particles/sparkles_main.dds"
+        emitter.Color = ColorSequence.new({
+            ColorSequenceKeypoint.new(0, Color3.new(1, 1, 0.5)),
+            ColorSequenceKeypoint.new(0.5, Color3.new(1, 0.8, 0)),
+            ColorSequenceKeypoint.new(1, Color3.new(1, 0.4, 0)),
+        })
+        emitter.Lifetime = NumberRange.new(1.5, 3)
+        emitter.Rate = 60
+        emitter.SpreadAngle = Vector2.new(0, 360)
+        emitter.Speed = NumberRange.new(5, 12)
+        emitter.Acceleration = Vector3.new(0, -3, 0)
+        emitter.Enabled = true
+
+        local beamAttach = Instance.new("Attachment")
+        beamAttach.Name = "BeamAttach"
+        beamAttach.Position = Vector3.new(0, 3, 0)
+        beamAttach.Parent = part
+
+        local beam = Instance.new("Beam")
+        beam.Parent = part
+        beam.Attachment0 = attachment
+        beam.Attachment1 = beamAttach
+        beam.Color = ColorSequence.new(Color3.new(1, 0.9, 0.1))
+        beam.LightEmission = 1
+        beam.Texture = "rbxasset://textures/particles/sparkles_main.dds"
+        beam.TextureLength = 2
+        beam.TextureSpeed = 1
+        beam.Transparency = NumberSequence.new(0.3)
+        beam.Width0 = 2
+        beam.Width1 = 0.5
+
+        task.delay(3, function()
+            emitter.Enabled = false
+            task.delay(2, function()
+                emitter:Destroy()
+                attachment:Destroy()
+                beam:Destroy()
+                beamAttach:Destroy()
+            end)
+        end)
     end,
 
     _UpdatePlayerGuis = function(self, field, player)
@@ -117,6 +266,10 @@ local FieldManagerService = Knit.CreateService({
     end,
 
     KnitStart = function(self)
+        local upgradeEvent = Instance.new("RemoteEvent")
+        upgradeEvent.Name = "UpgradeNoticeEvent"
+        upgradeEvent.Parent = game:GetService("ReplicatedStorage")
+
         local template = workspace:FindFirstChild("Field_1")
         if template then
             local existing = ServerStorage:FindFirstChild("FieldTemplate")

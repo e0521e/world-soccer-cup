@@ -38,6 +38,26 @@ local RewardService = Knit.CreateService({
             return self.Server:DeductCoins(player, amount)
         end,
 
+        GetPower = function(self, player)
+            return self.Server:GetPower(player)
+        end,
+
+        GetTrophies = function(self, player)
+            return self.Server:GetTrophies(player)
+        end,
+
+        CompleteTutorial = function(self, player)
+            return self.Server:CompleteTutorial(player)
+        end,
+
+        IsNewPlayer = function(self, player)
+            return self.Server:IsNewPlayer(player)
+        end,
+
+        ResolveMatch = function(self, player, targetUserId)
+            return self.Server:ResolveMatch(player, targetUserId)
+        end,
+
         OnCoinsChanged = Knit.CreateSignal(),
         OnLevelUp = Knit.CreateSignal(),
         OnNPCQualityUp = Knit.CreateSignal(),
@@ -55,14 +75,18 @@ local RewardService = Knit.CreateService({
 
     GetLevel = function(self, player)
         local data = self._playerData[player]
-        if not data then return { level = 1, multiplier = 1.0, nextCost = 0, loaded = false } end
+        if not data then
+            local defaultNext = PlayerLevels[2]
+            return { level = 1, multiplier = 1.0, nextCost = defaultNext and defaultNext.cost or 0, loaded = false }
+        end
 
         local level = data.Level
         local config = PlayerLevels[level] or PlayerLevels[1]
+        local nextConfig = PlayerLevels[level + 1]
         return {
             level = level,
             multiplier = config.multiplier,
-            nextCost = config.upgradeCost,
+            nextCost = nextConfig and nextConfig.cost or 0,
             loaded = true,
         }
     end,
@@ -183,6 +207,81 @@ local RewardService = Knit.CreateService({
         self.Client.OnNPCQualityUp:Fire(player, npcId, newQuality, qualityConfig.multiplier)
     end,
 
+    GetPower = function(self, player)
+        local data = self._playerData[player]
+        if not data then return 0 end
+
+        local config = PlayerLevels[data.Level] or PlayerLevels[1]
+        local power = config.power
+
+        local totalQualityMultiplier = 0
+        for _, quality in pairs(data.NPCTiers) do
+            local qConfig = NPCData.QualityTiers[quality] or NPCData.QualityTiers[1]
+            totalQualityMultiplier += qConfig.multiplier
+        end
+        power += math.floor(totalQualityMultiplier * 10)
+
+        return power
+    end,
+
+    GetTrophies = function(self, player)
+        local data = self._playerData[player]
+        return data and data.Trophies or 0
+    end,
+
+    CompleteTutorial = function(self, player)
+        local data = self._playerData[player]
+        if data then
+            data.New = false
+            self:_SaveData(player, true)
+            return true
+        end
+        return false
+    end,
+
+    IsNewPlayer = function(self, player)
+        local data = self._playerData[player]
+        local result = data and data.New == true or false
+        print("[IsNewPlayer]", player.Name, "data exists:", data ~= nil, "New value:", data and data.New, "result:", result)
+        return result
+    end,
+
+    ResolveMatch = function(self, player, targetUserId)
+        local data = self._playerData[player]
+        if not data then return { win = false, reason = "No data" } end
+
+        local targetPlayer = nil
+        for _, p in ipairs(game:GetService("Players"):GetPlayers()) do
+            if p.UserId == targetUserId then
+                targetPlayer = p
+                break
+            end
+        end
+        if not targetPlayer then return { win = false, reason = "Target offline" } end
+
+        local targetData = self._playerData[targetPlayer]
+        if not targetData then return { win = false, reason = "Target no data" } end
+
+        local myPower = self:GetPower(player)
+        local targetPower = self:GetPower(targetPlayer)
+
+        local total = myPower + targetPower
+        local roll = math.random(1, total)
+        local win = roll <= myPower
+
+        if win then
+            local coins = math.max(10, math.floor(targetPower * 0.1))
+            data.Coins += coins
+            self.Client.OnCoinsChanged:Fire(player, data.Coins, coins)
+        end
+
+        return {
+            win = win,
+            myPower = myPower,
+            targetPower = targetPower,
+        }
+    end,
+
     LoadPlayerData = function(self, player)
         local loaded = false
         if self._dataStore then
@@ -192,27 +291,24 @@ local RewardService = Knit.CreateService({
                 return self._dataStore:GetAsync(key)
             end)
             if success and data then
+                if data.Trophies == nil then data.Trophies = 0 end
                 self._playerData[player] = data
                 loaded = true
             end
         end
 
         if not loaded then
-            local defaultNPCs = {}
-            for i = 1, math.min(3, #NPCData.NPCList) do
-                table.insert(defaultNPCs, NPCData.NPCList[i].id)
-            end
-            local tiers = {}
-            for _, id in ipairs(defaultNPCs) do
-                tiers[id] = 1
-            end
-
             self._playerData[player] = {
                 Coins = 0,
                 Level = 1,
-                NPCTiers = tiers,
-                UnlockedNPCs = defaultNPCs,
+                NPCTiers = {},
+                UnlockedNPCs = {},
+                Trophies = 0,
+                New = true,
             }
+            print("[LoadPlayerData] new player", player.Name, "New set to true")
+        else
+            print("[LoadPlayerData] loaded from DataStore for", player.Name, "New:", self._playerData[player].New)
         end
     end,
 

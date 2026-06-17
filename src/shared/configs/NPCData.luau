@@ -91,11 +91,11 @@ local NPCList = {
 }
 
 local QualityTiers = {
-	{ level = 1, name = "Common", multiplier = 1.0, visualEffect = "none", cooldown = 10 },
-	{ level = 2, name = "Rare", multiplier = 1.5, visualEffect = "jersey", cooldown = 8 },
-	{ level = 3, name = "Epic", multiplier = 2.0, visualEffect = "gold", cooldown = 6 },
-	{ level = 4, name = "Legendary", multiplier = 3.0, visualEffect = "glow", cooldown = 4 },
-	{ level = 5, name = "Mythic", multiplier = 5.0, visualEffect = "dynamic", cooldown = 2 },
+	{ level = 1, name = "Common", multiplier = 1.0, visualEffect = "none", cooldown = 10, color3 = Color3.fromRGB(180, 180, 180) },
+	{ level = 2, name = "Rare", multiplier = 1.5, visualEffect = "jersey", cooldown = 8, color3 = Color3.fromRGB(50, 120, 255) },
+	{ level = 3, name = "Epic", multiplier = 2.0, visualEffect = "gold", cooldown = 6, color3 = Color3.fromRGB(180, 50, 255) },
+	{ level = 4, name = "Legendary", multiplier = 3.0, visualEffect = "glow", cooldown = 4, color3 = Color3.fromRGB(255, 140, 20) },
+	{ level = 5, name = "Mythic", multiplier = 5.0, visualEffect = "dynamic", cooldown = 2, color3 = Color3.fromRGB(230, 40, 40) },
 }
 
 return {

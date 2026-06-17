@@ -22,6 +22,7 @@ local Constants = {
     KICK_ANIM_TO_FLIGHT_DELAY = 1.3,   -- 踢球动画播放后到球飞行的延迟（秒），供人工调整
     ONLINE_TOTAL_MINUTES = 5,       -- 在线进度总时长（分钟）- 测试阶段减半
     NPC_UNLOCK_COUNTDOWN = 30,      -- NPC 槽位初始倒计时（秒）
+    WORLD_CUP_REQUIRED_NPCS = 11,   -- 参加世界杯所需最少 NPC 数量
 }
 
 return Constants
