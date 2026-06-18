@@ -25,24 +25,26 @@ local function findField()
 end
 
 local function findFirstNPC(field)
+	local player = Players.LocalPlayer
+	local char = player.Character
+	local npcTimer = Knit.GetService("NPCTimerService")
+	local slotPos = npcTimer:GetSlotPosition(1)
+	if not slotPos then
+		print("[Tutorial] no Slot1 position available")
+		return nil
+	end
 	for _, child in ipairs(Workspace:GetChildren()) do
-		if child:IsA("Model") then
+		if child:IsA("Model") and child ~= char then
 			local root = child:FindFirstChild("HumanoidRootPart")
 			if root and child:FindFirstChildWhichIsA("Humanoid") then
-				if field then
-					local fieldGround = field:FindFirstChild("Ground")
-					if fieldGround then
-						local dist = (root.Position - fieldGround.Position).Magnitude
-						if dist < 60 then
-							print("[Tutorial] found NPC", child.Name, "at", root.Position, "dist", dist)
-							return root
-						end
-					end
+				if (root.Position - slotPos).Magnitude < 3 then
+					print("[Tutorial] found NPC at Slot1:", child.Name)
+					return root
 				end
 			end
 		end
 	end
-	print("[Tutorial] no NPC near field")
+	print("[Tutorial] no NPC found at Slot1 position")
 	return nil
 end
 
@@ -63,44 +65,47 @@ end
 local function createBeamArrow(targetPos, text)
 	print("[Tutorial] createBeamArrow at", targetPos, "text:", text)
 
-	local pillar = Instance.new("Part")
-	pillar.Name = "TutorialPillar"
-	pillar.Size = Vector3.new(0.4, 8, 0.4)
-	pillar.Position = targetPos + Vector3.new(0, 4, 0)
-	pillar.Anchored = true
-	pillar.CanCollide = false
-	pillar.Material = Enum.Material.Neon
-	pillar.Color = Color3.new(1, 0.8, 0)
-	pillar.Transparency = 0.3
-	pillar.Parent = Workspace
+	local player = Players.LocalPlayer
+	local char = player.Character
+	local root = char and char:FindFirstChild("HumanoidRootPart")
 
-	local ring = Instance.new("Part")
-	ring.Name = "TutorialRing"
-	ring.Size = Vector3.new(3, 0.2, 3)
-	ring.Position = targetPos + Vector3.new(0, 0.3, 0)
-	ring.Anchored = true
-	ring.CanCollide = false
-	ring.Material = Enum.Material.Neon
-	ring.Color = Color3.new(1, 0.9, 0.1)
-	ring.Transparency = 0.2
-	ring.Shape = Enum.PartType.Cylinder
-	ring.Parent = Workspace
+	local targetPart = Instance.new("Part")
+	targetPart.Name = "TutorialBeamTarget"
+	targetPart.Size = Vector3.new(0.5, 0.5, 0.5)
+	targetPart.Position = targetPos + Vector3.new(0, 2, 0)
+	targetPart.Anchored = true
+	targetPart.CanCollide = false
+	targetPart.Transparency = 1
+	targetPart.Parent = Workspace
 
-	local labelPart = Instance.new("Part")
-	labelPart.Name = "TutorialLabelPart"
-	labelPart.Size = Vector3.new(0.5, 0.5, 0.5)
-	labelPart.Position = targetPos + Vector3.new(0, 2, 0)
-	labelPart.Anchored = true
-	labelPart.CanCollide = false
-	labelPart.Transparency = 1
-	labelPart.Parent = Workspace
+	local targetAttach = Instance.new("Attachment")
+	targetAttach.Name = "BeamTarget"
+	targetAttach.Parent = targetPart
+
+	local playerAttach
+	if root then
+		playerAttach = Instance.new("Attachment")
+		playerAttach.Name = "BeamPlayer"
+		playerAttach.Position = Vector3.new(0, 3, 0)
+		playerAttach.Parent = root
+	end
+
+	local beam = game:GetService("StarterGui"):FindFirstChild("BeamGuide")
+	if beam and playerAttach then
+		beam = beam:Clone()
+		beam.Attachment0 = targetAttach
+		beam.Attachment1 = playerAttach
+		beam.Parent = targetPart
+	else
+		warn("[Tutorial] BeamGuide or player character not found")
+	end
 
 	local billboard = Instance.new("BillboardGui")
 	billboard.Size = UDim2.new(0, 300, 0, 60)
 	billboard.StudsOffset = Vector3.new(0, 0, 0)
 	billboard.AlwaysOnTop = true
-	billboard.Adornee = labelPart
-	billboard.Parent = labelPart
+	billboard.Adornee = targetPart
+	billboard.Parent = targetPart
 
 	local label = Instance.new("TextLabel")
 	label.Size = UDim2.new(1, 0, 1, 0)
@@ -114,14 +119,14 @@ local function createBeamArrow(targetPos, text)
 	label.TextXAlignment = Enum.TextXAlignment.Center
 	label.Parent = billboard
 
-	return { pillar = pillar, ring = ring, labelPart = labelPart }
+	return { target = targetPart, playerAttach = playerAttach, beam = beam }
 end
 
 local function destroyArrow(arrow)
 	if arrow then
-		arrow.pillar:Destroy()
-		arrow.ring:Destroy()
-		arrow.labelPart:Destroy()
+		if arrow.beam then arrow.beam:Destroy() end
+		if arrow.target then arrow.target:Destroy() end
+		if arrow.playerAttach then arrow.playerAttach:Destroy() end
 	end
 end
 
@@ -144,7 +149,9 @@ local TutorialController = Knit.CreateController({
 			return end
 
 		self._running = true
-		self:_RunTutorial()
+		task.spawn(function()
+			self:_RunTutorial()
+		end)
 	end,
 
 	_RunTutorial = function(self)

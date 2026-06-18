@@ -159,7 +159,9 @@ local BallSpawnService = Knit.CreateService({
 
         local anim = Instance.new("Animation")
         anim.AnimationId = Constants.NPC_KICK_ANIM_ID
-        local track = humanoid:LoadAnimation(anim)
+        local animator = humanoid:FindFirstChildWhichIsA("Animator") or Instance.new("Animator")
+        if not animator.Parent then animator.Parent = humanoid end
+        local track = animator:LoadAnimation(anim)
         if track then
             track.Looped = false
             track:Play()

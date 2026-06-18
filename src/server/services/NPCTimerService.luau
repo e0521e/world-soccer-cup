@@ -13,6 +13,10 @@ local NPCTimerService = Knit.CreateService({
             return self.Server:GetActiveNPCs(player)
         end,
 
+        GetSlotPosition = function(self, player, slotId)
+            return self.Server:GetSlotPosition(player, slotId)
+        end,
+
         GetTimerRemaining = function(self, player, slotId)
             return self.Server:GetTimerRemaining(player, slotId)
         end,
@@ -39,6 +43,14 @@ local NPCTimerService = Knit.CreateService({
             })
         end
         return result
+    end,
+
+    GetSlotPosition = function(self, player, slotId)
+        local positions = self._slotPositions[player]
+        if not positions then return nil end
+        local pos = positions[slotId]
+        if not pos then return nil end
+        return pos
     end,
 
     GetTimerRemaining = function(self, player, slotId)
@@ -161,9 +173,7 @@ local NPCTimerService = Knit.CreateService({
         local positions = self._slotPositions[player] or {}
         local pos = positions[slotData.slotId]
         if not pos then return end
-        local ox = (math.random() - 0.5) * 6
-        local oz = (math.random() - 0.5) * 6
-        local targetPos = Vector3.new(pos.X + ox, pos.Y + 2.5, pos.Z + oz)
+        local targetPos = Vector3.new(pos.X, pos.Y + 2.5, pos.Z)
         local dropHeight = 50
         local dropDuration = 1.5
         local targetRot = CFrame.Angles(0, math.rad(90), 0)

@@ -37,6 +37,7 @@
 - 不要修改 Packages/ 目录（由 wally install 生成）
 - 不要在 Server 代码中放客户端逻辑（安全风险）
 - 禁止使用 `Model:SetPrimaryPartCFrame()`，必须使用 `Model:PivotTo()` 替代
+- 禁止使用 `Humanoid:LoadAnimation()`，必须使用 `Humanoid.Animator:LoadAnimation()` 替代
 
 ## Markdown 格式约定
 

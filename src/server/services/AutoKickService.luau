@@ -71,7 +71,9 @@ local AutoKickService = Knit.CreateService({
 
         local runAnim = Instance.new("Animation")
         runAnim.AnimationId = Constants.NPC_RUN_ANIM_ID
-        local runTrack = humanoid:LoadAnimation(runAnim)
+        local animator = humanoid:FindFirstChildWhichIsA("Animator") or Instance.new("Animator")
+        if not animator.Parent then animator.Parent = humanoid end
+        local runTrack = animator:LoadAnimation(runAnim)
         if runTrack then
             runTrack.Looped = true
             runTrack:Play()
@@ -109,7 +111,9 @@ local AutoKickService = Knit.CreateService({
 
         local anim = Instance.new("Animation")
         anim.AnimationId = Constants.NPC_KICK_ANIM_ID
-        local animTrack = humanoid:LoadAnimation(anim)
+        local animator = humanoid:FindFirstChildWhichIsA("Animator") or Instance.new("Animator")
+        if not animator.Parent then animator.Parent = humanoid end
+        local animTrack = animator:LoadAnimation(anim)
         if animTrack then
             animTrack.Looped = false
             animTrack:Play()
