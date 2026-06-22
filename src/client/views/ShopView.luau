@@ -258,8 +258,8 @@ function ShopView:Close()
 end
 
 function ShopView:UpdateCoinsDisplay()
-	local rewardService = Knit.GetService("RewardService")
-	local coins = rewardService:GetCoins()
+	local pds = Knit.GetService("PlayerDataService")
+	local coins = pds:GetCoins()
 	self._coinsLabel.Text = "💵 " .. tostring(math.floor(coins))
 end
 

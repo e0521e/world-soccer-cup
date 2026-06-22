@@ -2,6 +2,7 @@
 
 local Knit = require(game:GetService("ReplicatedStorage").Packages.Knit)
 local Constants = require(game:GetService("ReplicatedStorage").Shared.constants.Constants)
+local KickAnimList = require(game:GetService("ReplicatedStorage").Shared.configs.KickAnimList)
 local TweenService = game:GetService("TweenService")
 local ServerStorage = game:GetService("ServerStorage")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
@@ -20,15 +21,16 @@ local BallSpawnService = Knit.CreateService({
     _activeBalls = {},
     _spawnTimer = nil,
 
-    SpawnBall = function(self, field)
+    SpawnBall = function(self, field, player)
         local ballFolder = ServerStorage:FindFirstChild("Ball")
         if not ballFolder then return end
 
-        local ballTemplates = ballFolder:GetChildren()
-        if #ballTemplates == 0 then return end
+        local pds = Knit.GetService("PlayerDataService")
+        local ballIds = pds:GetBallIds(player)
+        local ballId = ballIds[math.random(#ballIds)]
 
-        local template = ballTemplates[math.random(#ballTemplates)]
-        if not template:IsA("Model") then return end
+        local template = ballFolder:FindFirstChild("ball" .. ballId)
+        if not template or not template:IsA("Model") then return end
 
         local ball = template:Clone()
         ball.Name = "FieldBall_" .. tostring(tick())
@@ -157,8 +159,10 @@ local BallSpawnService = Knit.CreateService({
 
         self.Client.OnPlayerKick:Fire(player, ball.Name)
 
+        local kickConfig = KickAnimList[math.random(#KickAnimList)]
+
         local anim = Instance.new("Animation")
-        anim.AnimationId = Constants.NPC_KICK_ANIM_ID
+        anim.AnimationId = kickConfig.animId
         local animator = humanoid:FindFirstChildWhichIsA("Animator") or Instance.new("Animator")
         if not animator.Parent then animator.Parent = humanoid end
         local track = animator:LoadAnimation(anim)
@@ -167,7 +171,7 @@ local BallSpawnService = Knit.CreateService({
             track:Play()
         end
 
-        task.wait(Constants.KICK_ANIM_TO_FLIGHT_DELAY)
+        task.wait(kickConfig.delay)
         if rootPart then
             humanoid.AutoRotate = true
         end
@@ -182,16 +186,15 @@ local BallSpawnService = Knit.CreateService({
         if not goal then return end
         local goalChk = goal:FindFirstChild("goal_chk")
         if not goalChk then return end
+        local goalChk2 = goalChk:FindFirstChild("goal_chk2")
 
-        local gPos = goalChk.Position
-        local gSize = goalChk.Size
-        local toGoal = Vector3.new(gPos.X, 0, gPos.Z).Unit
-        local offsetDist = 2 + math.random() * 8
-        local targetPos = Vector3.new(
-            gPos.X + toGoal.X * offsetDist,
-            Constants.BALL_LAND_Y + 0.1,
-            gPos.Z + toGoal.Z * offsetDist
-        )
+        local gSize = goalChk2 and goalChk2.Size or goalChk.Size
+        local gCf = (goalChk2 or goalChk).CFrame
+        local rx = (math.random() - 0.5) * gSize.X
+        local rz = (math.random() - 0.5) * gSize.Z
+        local localOffset = Vector3.new(rx, 0, rz)
+        local targetPos = gCf:PointToWorldSpace(localOffset)
+        targetPos = Vector3.new(targetPos.X, Constants.BALL_LAND_Y + 0.1, targetPos.Z)
         local mainPart = ballData.mainPart
         local startPos = mainPart.Position
         local arcHeight = math.random(Constants.BALL_ARC_MIN, Constants.BALL_ARC_MAX)
@@ -311,7 +314,7 @@ local BallSpawnService = Knit.CreateService({
                 for _, player in ipairs(players) do
                     local field = fieldMgr:GetField(player)
                     if field then
-                        self:SpawnBall(field)
+                        self:SpawnBall(field, player)
                     end
                 end
             end

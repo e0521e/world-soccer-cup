@@ -220,18 +220,19 @@ return MyController
 
 | 服务 | 核心职责 |
 | --- | --- |
-| NPCTimerService | 10 NPC 预分配轮转、3 槽错开定时、自动补位（_AdvanceSlotNPC）、占位点读取 |
+| NPCTimerService | 10 NPC 预分配轮转、3 槽错开定时、自动补位（_AdvanceSlotNPC）、占位点读取；满员后进入 PostFullUnlockMode（NPC 11/12/13 无倒计时，提示文字，可重复认领） |
 | AutoKickService | NPC 寻路最近球（Humanoid:MoveTo）、跑动画、踢动画、球弧线飞行、goal_chk 进球检测 |
-| RewardService | 金币结算、等级管理、NPC 品质管理、DataStore 读写、NPC 解锁 |
-| PlayerService | 玩家会话管理、角色初始化、加入/离开处理 |
+| PlayerDataService | 玩家数据单一数据源、DataStore 读写、金币/等级/NPC/球 ID 等全字段 CRUD、数据变更信号 |
+| RewardService | 奖励计算逻辑（金币公式、NPC 解锁/品质提升），数据操作委托给 PlayerDataService |
+| PlayerService | 玩家会话管理、角色初始化、加入/离开处理；WorldCupPrompt 触发 -> 奖杯升起 -> 获胜 -> 重置 NPCProgressService |
 | FieldManagerService | 模板克隆（Folder→Model）、6 场六边形排布、玩家分配/释放、返回场地 Ground 坐标（GetGroundPosition） |
-| BallSpawnService | 中场掉球（中心 40×40）、上限 `MAX_BALLS×N`、每轮每人 1 球、NPC 自动踢检测 |
-| NPCProgressService | 在线时间跟踪、进度推流（OnTick/MinuteReached/TeamComplete）、供 UI 轮询 GetElapsedTime |
+| BallSpawnService | 中场掉球（中心 40×40）、上限 `MAX_BALLS×N`、每轮每人 1 球、从玩家 `BallIds` 列表随机选球、NPC 自动踢检测 |
+| NPCProgressService | 在线时间跟踪、进度推流（OnTick/MinuteReached/TeamComplete）、支持 offset 偏移的多轮解锁、ResetProgress 方法重置进度 |
 | MusicService | 音频播放：按名播放背景音乐/音效、指定父级位置、音量控制 |
 
 ### 4.1 NPCTimerService
 
-10 NPC 预分配轮转、3 槽错开定时、自动补位（_AdvanceSlotNPC）、占位点读取。
+10 NPC 预分配轮转、3 槽错开定时、自动补位（_AdvanceSlotNPC）、占位点读取、满员后 PostFullUnlockMode。
 
 | 方法 | 可见性 | 说明 |
 | --- | --- | --- |
@@ -242,12 +243,17 @@ return MyController
 | `OnTimerExpired(npcIndex)` | 内部 | 倒计时归零回调 — 触发自动接管流程 |
 | `GetActiveNPCs()` | Client | 返回当前 3 个活跃 NPC 的索引列表 |
 | `GetRemainingTime(npcIndex)` | Client | 查询指定 NPC 的剩余倒计时 |
+| `EnterPostFullUnlockMode(player)` | 内部 | 满员后触发：清空3槽，放置offset+1~offset+3的NPC，无倒计时，提示文字，可重复认领 |
+| `LeavePostFullUnlockMode(player)` | 内部 | 离开满员模式 |
+| `_CleanupSlotNPCs(player)` | 内部 | 清空玩家所有槽位的NPC模型和提示 |
 
 | Client 暴露 | 类型 | 说明 |
 | --- | --- | --- |
 | `OnTimerUpdated` | Signal | 任意 NPC 计时变化时通知客户端（npcIndex, remainingTime） |
 | `OnTimerExpired` | Signal | 某 NPC 计时归零时通知客户端（npcIndex） |
 | `OnActiveNPCsChanged` | Signal | 活跃 NPC 列表变化时通知客户端 |
+
+**PostFullUnlockMode 流程**：`NPCProgressService.OnTeamComplete` → 检测 `#UnlockedNPCs >= 10` → `EnterPostFullUnlockMode` → 3槽替换为 offset NPC → BillboardGui 显示"Win World Cup to join me!" → 玩家认领后执行踢球序列 → 8秒冷却后重新可认领
 
 **NPC 槽位数据**：
 
@@ -316,39 +322,68 @@ end)
 
 ### 4.3 RewardService
 
-金币结算、等级管理、NPC 品质管理、DataStore 读写、NPC 解锁
+奖励计算逻辑（金币公式、NPC 解锁/品质提升），数据操作委托给 PlayerDataService。
 
 | 方法 | 可见性 | 说明 |
 | --- | --- | --- |
-| `GetPlayerData(player)` | 内部 | 从 DataStore 读取或创建默认 PlayerData |
-| `SavePlayerData(player)` | 内部 | 将 PlayerData 写回 DataStore |
-| `AwardCoins(player, amount)` | 内部 | 原子增加金币（UpdateAsync） |
-| `UnlockNPC(player, npcIndex)` | 内部 | 消耗金币解锁 NPC |
-| `SelectActiveNPCs(player, indices)` | 内部 | 保存玩家选择的 3 个活跃 NPC |
+| `AwardGoal(player, npcId)` | 内部 | 按公式 BASE_COINS × 等级倍率 × 品质倍率 计算金币并发放，检查 Double Coins GamePass |
+| `UnlockNPC(player, npcId)` | 内部 | 消耗金币解锁 NPC（委托 PlayerDataService 操作数据） |
+| `UpgradeNPCQuality(player, npcId)` | 内部 | NPC 品质 +1（上限 MAX_NPC_QUALITY，委托 PlayerDataService 操作数据） |
+| `GetNPCQuality(player, npcId)` | Client | 查询 NPC 品质（委托 PlayerDataService） |
+| `GetUnlockedNPCs(player)` | Client | 查询已解锁 NPC 列表（委托 PlayerDataService） |
+
+| Client 暴露 | 类型 | 说明 |
+| --- | --- | --- |
+| `OnNPCQualityUp` | Signal | NPC 品质提升时通知（npcId, newQuality, multiplier） |
+| `OnNPCUnlocked` | Signal | NPC 解锁时通知（npcId, cost） |
+
+### 4.8 PlayerDataService
+
+玩家数据单一数据源。所有持久化玩家数据的 CRUD 操作、DataStore 读写、数据变更信号。
+
+| 方法 | 可见性 | 说明 |
+| --- | --- | --- |
+| `LoadPlayerData(player)` | 内部 | 从 DataStore 读取或创建默认 PlayerData |
+| `SavePlayerData(player)` | 内部 | 强制将 PlayerData 写回 DataStore |
 | `GetCoins(player)` | Client | 查询金币余额 |
-| `IsNPCUnlocked(player, npcIndex)` | Client | 查询 NPC 解锁状态 |
+| `AddCoins(player, delta)` | 内部 | 增加金币（触发 OnCoinsChanged） |
+| `DeductCoins(player, amount)` | 内部 | 扣减金币，返回是否成功（触发 OnCoinsChanged） |
+| `GetLevel(player)` | Client | 查询等级信息（level, multiplier, nextCost） |
+| `UpgradeLevel(player)` | Client | 升级（检查金币→扣减→升级→触发 OnLevelUp） |
+| `GetPower(player)` | Client | 计算战力值（等级 power + NPC 品质倍率） |
+| `GetTrophies(player)` | Client | 查询奖杯数 |
+| `AddTrophies(player, delta)` | 内部 | 增加奖杯 |
+| `GetBallIds(player)` | Client | 查询已拥有球 ID 列表 |
+| `AddBallId(player, ballId)` | 内部 | 增加球 ID |
+| `IsNewPlayer(player)` | Client | 查询是否新玩家 |
+| `CompleteTutorial(player)` | Client | 完成新手引导（设置 New=false） |
+| `GetNPCQuality(player, npcId)` | 内部 | 查询 NPC 品质 |
+| `SetNPCQuality(player, npcId, quality)` | 内部 | 设置 NPC 品质 |
+| `GetUnlockedNPCs(player)` | 内部 | 查询已解锁 NPC 列表 |
+| `AddUnlockedNPC(player, npcId)` | 内部 | 增加已解锁 NPC |
+| `GetData(player)` | 内部 | 返回完整 _playerData 引用（AdminService 用） |
+| `ResolveMatch(player, targetUserId)` | 内部 | 战力对决逻辑 |
 
 | Client 暴露 | 类型 | 说明 |
 | --- | --- | --- |
 | `OnCoinsChanged` | Signal | 金币变化时通知客户端（newAmount, delta） |
-| `OnNPCUnlocked` | Signal | NPC 解锁时通知（npcIndex, npcName） |
+| `OnLevelUp` | Signal | 等级提升时通知（newLevel, multiplier） |
 
 **DataStore 键**：
 
 | DataStore 名称 | 键格式 | 存储内容 |
 | --- | --- | --- |
-| `PlayerData` | `pdata_{userId}` | 完整 PlayerData JSON 字符串 |
+| `FreeKickData` | `PlayerData_{userId}` | 完整 PlayerData JSON 字符串 |
 
 **DataStore 策略**：
-- 使用 `DataStoreService:GetDataStore("PlayerData")`
+- 使用 `DataStoreService:GetDataStore("FreeKickData")`
 - 玩家加入时 `GetAsync`，离开时 `SetAsync`
 - 写入失败重试 3 次（指数退避）
-- 金币增减使用 `UpdateAsync` 实现原子操作
 - 每 60 秒自动保存缓存数据
 
 ### 4.4 PlayerService
 
-玩家会话管理。
+玩家会话管理 + 世界杯奖杯触发。
 
 | 方法 | 可见性 | 说明 |
 | --- | --- | --- |
@@ -360,6 +395,15 @@ end)
 | Client 暴露 | 类型 | 说明 |
 | --- | --- | --- |
 | `OnPlayerReady` | Signal | 玩家初始化完成时通知客户端 |
+
+**WorldCupPrompt 处理**（KnitStart 中绑定 `Workspace.trophy.Main.WorldCupPrompt.Triggered`）：
+1. 检查 `#UnlockedNPCs >= WORLD_CUP_REQUIRED_NPCS`（=10），不足则通知客户端 "Need 10 players"
+2. 通知客户端 "WorldCupStart"
+3. 奖杯模型 `tween` 升至玩家头顶 15 studs（1.5s）
+4. 随机等待 11-20 秒后奖杯归位（1.5s）
+5. `AddTrophies(player, 1)` + `SavePlayerData(player)`
+6. 计算 offset = `#UnlockedNPCs + 1`，调用 `NPCProgressService:ResetProgress(player, offset)` 开始下一轮
+7. 通知客户端 "WorldCupDone"
 
 **玩家出生位置**：中场附近 `(0, 5, 0)`，位于球场中圈区域。
 
@@ -381,11 +425,11 @@ end)
 
 ### 4.6 BallSpawnService
 
-按场禁区掉球（CenterX/CenterZ 属性）、3 球上限、自动踢检测、玩家踢球处理。
+按场禁区掉球（CenterX/CenterZ 属性）、3 球上限、从玩家 `BallIds` 列表随机选球、自动踢检测、玩家踢球处理。
 
 | 方法 | 可见性 | 说明 |
 | --- | --- | --- |
-| `SpawnBallInField(fieldIndex)` | 内部 | 在指定场地禁区中心掉球（读取 CenterX/CenterZ 属性） |
+| `SpawnBallInField(fieldIndex)` | 内部 | 在指定场地禁区中心掉球（读取 CenterX/CenterZ 属性），从玩家 `BallIds` 列表中随机选球 ID |
 | `HandleAutoKick(fieldIndex)` | 内部 | 自动踢检测：超时未踢球触发 NPC 自动踢 |
 | `HandlePlayerKick(player, ball)` | 内部 | 玩家主动踢球处理 |
 | `CleanupBalls(fieldIndex)` | 内部 | 场地球数量超过 3 时清理多余球 |
@@ -396,20 +440,21 @@ end)
 
 ### 4.7 NPCProgressService
 
-在线时间跟踪、进度推流（OnTick/MinuteReached/TeamComplete）、供 UI 轮询 GetElapsedTime。
+在线时间跟踪、多轮进度推流（OnTick/MinuteReached/TeamComplete）、支持 offset 偏移的重复解锁、ResetProgress 重置。
 
 | 方法 | 可见性 | 说明 |
 | --- | --- | --- |
 | `GetElapsedTime(player)` | Client | 返回当前会话总在线时间（秒） |
-| `OnTick()` | 内部 | 每 0.1 秒更新在线时间 |
-| `MinuteReached(minute)` | 内部 | 每分钟整点触发里程碑事件 |
-| `TeamComplete()` | 内部 | 全队进度完成时触发 |
+| `ResetProgress(player, startIndex)` | 内部 | 停止当前循环，清除数据，从 startIndex 开始新循环 |
+| `_InitPlayer(player, startIndex)` | 内部 | 创建进度数据，每秒循环推进进度，按 offset 取 NPCList |
 
 | Client 暴露 | 类型 | 说明 |
 | --- | --- | --- |
 | `OnTimeTick` | Signal | 每秒推送当前在线时间 |
-| `OnMinuteReached` | Signal | 每分钟里程碑通知 |
+| `OnMinuteReached` | Signal | 每分钟里程碑通知（minuteIndex, npcId, displayName） |
 | `OnTeamComplete` | Signal | 全队完成通知 |
+
+**多轮解锁机制**：`_InitPlayer` 接受 `startIndex` 参数，从 `NPCData.NPCList[startIndex]` 开始顺序取 `ACTIVE_NPC_COUNT` 个 NPC。世界杯胜利后 `PlayerService` 调用 `ResetProgress(player, #UnlockedNPCs + 1)` 开始下一轮。
 
 ### Knit 信号断层说明
 
@@ -441,7 +486,8 @@ Controller 位于 `src/client/controllers/` 目录。
 | NPCTimerService | `OnTimerExpired` — 触发接管过渡 |
 | AutoKickService | `OnGoalScored` — 进球特效 |
 | AutoKickService | `OnKickMissed` — 未进球提示 |
-| RewardService | `OnCoinsChanged` — 更新金币显示 |
+| PlayerDataService | `OnCoinsChanged` — 更新金币显示 |
+| PlayerDataService | `OnLevelUp` — 升级反馈 |
 
 ### 5.2 CameraController
 
@@ -535,14 +581,31 @@ Controller 位于 `src/client/controllers/` 目录。
 │        │             │
 │        ▼             ▼
 │  ┌────────────────────────────────────┐
-│  │         CheckLevelUp              │ ← 检查是否可升级, 显示升级选项
-│  └─────────────┬──────────────────────┘
-│                │
-│                ▼
-│  ┌────────────────────────────────────┐
 │  │         NextTimer                  │ ← 返回 TimerRunning，
 │  │  从剩余 NPC 中选下一个激活          │    进入下一轮
-└──│  新 NPC 头顶开始倒计时              │
+│  │  新 NPC 头顶开始倒计时              │
+│  └─────────────┬──────────────────────┘
+│                │
+│                ▼  ← 共解锁 10 次
+│  ┌────────────────────────────────────┐
+│  │     TeamComplete (满员等待)        │ ← NPCProgressService.OnTeamComplete
+│  │     3 槽切换为 offset NPC          │    NPCTimerService.EnterPostFullUnlockMode
+│  │     无倒计时，提示文字               │
+│  └─────────────┬──────────────────────┘
+│                │ 玩家走向奖杯，按 E
+│                ▼
+│  ┌────────────────────────────────────┐
+│  │     WorldCup / 奖杯模式            │ ← PlayerService 处理
+│  │     奖杯升至玩家头顶 (1.5s)         │
+│  │     等待 11-20s                    │
+│  │     奖杯归位 (1.5s)                │
+│  │     Trophies+1                     │
+│  └─────────────┬──────────────────────┘
+│                │ ResetProgress(offset)
+│                ▼
+│  ┌────────────────────────────────────┐
+│  │     下一轮 TimerRunning            │ ← 返回顶部，offset 递增
+└──│  新一批 10 个 NPC 开始解锁          │
                     └────────────────────────────────────┘
 ```
 
@@ -561,6 +624,8 @@ Controller 位于 `src/client/controllers/` 目录。
 | GoalDetected | 瞬发 | Touch 事件判定 |
 | AwardCoins | ~2 秒 | 金币增加 + UI 特效 |
 | NextTimer | ~1 秒 | 选下一个 NPC，开始新倒计时 |
+| TeamComplete | 等待 | 10人解锁后，3槽切换为offset NPC，无倒计时 |
+| WorldCup | 11-20s | 奖杯升起，等待后 Trophies+1，重置进度 |
 
 ---
 
@@ -574,6 +639,7 @@ type PlayerData = {
     Level: number,
     NPCTiers: { [string]: number },  -- npcId → quality level (1~5)
     UnlockedNPCs: { string },
+    BallIds: { string },  -- 已拥有的球模型 ID 列表（默认 ["1"]）
     ActiveSlots: { string },  -- 3 NPC IDs currently active on field
 }
 ```
@@ -643,17 +709,18 @@ local PLAYER_EVENTS = {
 
 | DataStore 名称 | 键格式 | 存储内容 |
 | --- | --- | --- |
-| PlayerData | PlayerData_<userId> | JSON 对象含 Coins / Level / NPCTiers / UnlockedNPCs |
+| FreeKickData | PlayerData_<userId> | JSON 对象含 Coins / Level / NPCTiers / UnlockedNPCs / BallIds |
 
 ### 7.6 数据流
 
 ```text
-玩家进入     → PlayerService          → DataStore:GetAsync → 缓存到内存
-NPC 进球     → AutoKickService        → 通知 RewardService
-             → RewardService          → UpdateAsync 原子增加 Coins
-             → RewardService          → Signal OnCoinsChanged → UIController 更新显示
-玩家离开     → PlayerService          → DataStore:SetAsync 写入
-周期存档     → RewardService          → 每 60 秒自动保存
+玩家进入     → PlayerService          → PlayerDataService.LoadPlayerData → DataStore:GetAsync → 缓存到内存
+NPC 进球     → AutoKickService        → 通知 RewardService → AwardGoal
+             → RewardService          → PlayerDataService.AddCoins → OnCoinsChanged → UIController 更新显示
+玩家升级     → FieldManagerService    → PlayerDataService.UpgradeLevel → OnLevelUp → UIController 更新显示
+NPC 解锁     → RewardService          → UnlockNPC → PlayerDataService 数据操作 → OnNPCUnlocked
+玩家离开     → PlayerService          → PlayerDataService.SavePlayerData → DataStore:SetAsync 写入
+周期存档     → PlayerDataService      → 每 60 秒自动保存
 ```
 
 ---

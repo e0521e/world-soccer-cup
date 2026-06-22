@@ -28,6 +28,7 @@ local NPCTimerService = Knit.CreateService({
 
     _playerSlots = {},
     _slotPositions = {},
+    _postFullUnlock = {},
 
     GetActiveNPCs = function(self, player)
         local slots = self._playerSlots[player]
@@ -74,7 +75,13 @@ local NPCTimerService = Knit.CreateService({
         return nil
     end,
 
-    ActivateNPCs = function(self, player)
+    ActivateNPCs = function(self, player, startIndex)
+        startIndex = startIndex or 1
+
+        self:_CleanupSlotNPCs(player)
+        self._postFullUnlock[player] = nil
+        self._playerSlots[player] = nil
+
         local positions = {}
         local fieldMgr = Knit.GetService("FieldManagerService")
         local field = fieldMgr:GetField(player)
@@ -108,14 +115,18 @@ local NPCTimerService = Knit.CreateService({
         self._playerSlots[player] = slots
         local playerService = Knit.GetService("PlayerService")
 
-        -- Pre-assign 10 NPCs to 3 slots, round-robin
         local slotQueues = { {}, {}, {} }
         for i = 1, Constants.ACTIVE_NPC_COUNT do
             local slotIdx = ((i - 1) % 3) + 1
-            table.insert(slotQueues[slotIdx], NPCData.NPCList[i].id)
+            local npcIdx = startIndex + i - 1
+            local npcData = NPCData.NPCList[npcIdx]
+            if npcData then
+                table.insert(slotQueues[slotIdx], npcData.id)
+            end
         end
 
         for i = 1, 3 do
+            if not slotQueues[i] or #slotQueues[i] == 0 then break end
             local npcId = slotQueues[i][1]
             local quality = playerService:GetNPCQuality(player, npcId)
             local qualityData = NPCData.QualityTiers[quality] or NPCData.QualityTiers[1]
@@ -207,7 +218,7 @@ local NPCTimerService = Knit.CreateService({
         
         local gui = Instance.new("BillboardGui")
         gui.Name = "TimerGui"
-        gui.Size = UDim2.new(0, 100, 0, 40)
+        gui.Size = UDim2.new(0, if slotData.isPostUnlock then 160 else 100, 0, if slotData.isPostUnlock then 50 else 40)
         gui.StudsOffset = Vector3.new(0, 8, 0)
         gui.AlwaysOnTop = true
 		gui.Parent = npcModel:FindFirstChild("HumanoidRootPart") or npcModel
@@ -220,7 +231,12 @@ local NPCTimerService = Knit.CreateService({
         label.TextStrokeTransparency = 0.5
         label.TextScaled = true
         label.Font = Enum.Font.GothamBold
-        label.Text = "0"
+        if slotData.isPostUnlock then
+            label.Text = "Win World Cup\nto join me!"
+            label.TextColor3 = Color3.new(0.3, 0.8, 1)
+        else
+            label.Text = "0"
+        end
         label.Parent = gui
 
         local qualityLabel = Instance.new("TextLabel")
@@ -231,8 +247,12 @@ local NPCTimerService = Knit.CreateService({
         qualityLabel.TextColor3 = Color3.new(1, 0.84, 0)
         qualityLabel.TextScaled = true
         qualityLabel.Font = Enum.Font.GothamBold
-        local qData = NPCData.QualityTiers[slotData.quality] or NPCData.QualityTiers[1]
-        qualityLabel.Text = qData.name .. " x" .. tostring(qData.multiplier)
+        if slotData.isPostUnlock then
+            qualityLabel.Text = ""
+        else
+            local qData = NPCData.QualityTiers[slotData.quality] or NPCData.QualityTiers[1]
+            qualityLabel.Text = qData.name .. " x" .. tostring(qData.multiplier)
+        end
         qualityLabel.Parent = gui
 
         self:_ApplyQualityVisual(npcModel, slotData.quality)
@@ -365,7 +385,7 @@ local NPCTimerService = Knit.CreateService({
         self:_BeginTimer(player, sd, cooldown)
     end,
 
-    _MakeClaimable = function(self, player, slotData)
+    _MakeClaimable = function(self, player, slotData, isPostUnlock)
         local npcModel = slotData.npcModel
         if not npcModel then return end
 
@@ -375,8 +395,10 @@ local NPCTimerService = Knit.CreateService({
         if gui then
             local label = gui:FindFirstChild("TimerLabel")
             if label then
-                label.Text = "PRESS E"
-                label.TextColor3 = Color3.new(0, 1, 0)
+                if not isPostUnlock then
+                    label.Text = "PRESS E"
+                    label.TextColor3 = Color3.new(0, 1, 0)
+                end
             end
         end
 
@@ -408,7 +430,20 @@ local NPCTimerService = Knit.CreateService({
             end
             local playerService = Knit.GetService("PlayerService")
             playerService:TakeoverNPC(claimingPlayer, slotData)
-            self:_RefillSlot(player, slotData)
+            if isPostUnlock then
+                task.delay(8, function()
+                    if not slotData.npcModel then return end
+                    slotData.claimed = false
+                    prompt.Enabled = true
+                    local newHL = Instance.new("Highlight")
+                    newHL.Name = "ClaimHighlight"
+                    newHL.FillColor = Color3.new(0, 1, 0)
+                    newHL.FillTransparency = 0.6
+                    newHL.Parent = slotData.npcModel
+                end)
+            else
+                self:_RefillSlot(player, slotData)
+            end
         end)
     end,
 
@@ -495,6 +530,63 @@ local NPCTimerService = Knit.CreateService({
         self:_BeginTimer(player, newSlot, Constants.NPC_UNLOCK_COUNTDOWN * 3)
     end,
 
+    _CleanupSlotNPCs = function(self, player)
+        local slots = self._playerSlots[player]
+        if not slots then return end
+        for _, sd in pairs(slots) do
+            sd.isActive = false
+            self:_CleanupClaimPrompt(sd)
+            if sd.npcModel then
+                sd.npcModel:Destroy()
+                sd.npcModel = nil
+            end
+        end
+    end,
+
+    EnterPostFullUnlockMode = function(self, player)
+        local pds = Knit.GetService("PlayerDataService")
+        local unlocked = pds:GetUnlockedNPCs(player)
+        local count = #unlocked
+        if count < 10 then return end
+        if self._postFullUnlock[player] then return end
+        self._postFullUnlock[player] = true
+
+        self:_CleanupSlotNPCs(player)
+
+        local offset = count + 1
+        local positions = self._slotPositions[player] or {}
+
+        local slots = self._playerSlots[player]
+        if not slots then return end
+
+        for i = 1, 3 do
+            local npcIdx = offset + i - 1
+            local npcData = NPCData.NPCList[npcIdx]
+            if not npcData then break end
+
+            local slotData = {
+                slotId = i,
+                npcId = npcData.id,
+                quality = 1,
+                qualityMultiplier = 1.0,
+                timerRemaining = 0,
+                isActive = false,
+                isPostUnlock = true,
+                npcModel = nil,
+                claimPrompt = nil,
+                claimed = false,
+                firstClaimDone = false,
+            }
+            slots[i] = slotData
+            self:_PlaceNPCOnField(player, slotData)
+            self:_MakeClaimable(player, slotData, true)
+        end
+    end,
+
+    LeavePostFullUnlockMode = function(self, player)
+        self._postFullUnlock[player] = nil
+    end,
+
     KnitInit = function(self)
         print("NPCTimerService initialized")
     end,
@@ -513,6 +605,16 @@ local NPCTimerService = Knit.CreateService({
             end
             print("NPCTimerService: cloned NPC models to ReplicatedStorage.NPCHeads")
         end
+
+        local npcProg = Knit.GetService("NPCProgressService")
+        npcProg.Client.OnTeamComplete:Connect(function(player)
+            local pds = Knit.GetService("PlayerDataService")
+            local unlocked = pds:GetUnlockedNPCs(player)
+            if #unlocked >= 10 then
+                self:EnterPostFullUnlockMode(player)
+            end
+        end)
+
         print("NPCTimerService started")
     end,
 })

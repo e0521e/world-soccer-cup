@@ -77,14 +77,14 @@ local ShopService = Knit.CreateService({
 			return false
 		end
 
-		local rewardService = Knit.GetService("RewardService")
-		local coins = rewardService:GetCoins(player)
+		local pds = Knit.GetService("PlayerDataService")
+		local coins = pds:GetCoins(player)
 		if coins < cost then
 			self.Client.OnPurchaseFailed:Fire(player, "GamePass", gamePassId, "Insufficient coins")
 			return false
 		end
 
-		local ok = rewardService:DeductCoins(player, cost)
+		local ok = pds:DeductCoins(player, cost)
 		if not ok then
 			self.Client.OnPurchaseFailed:Fire(player, "GamePass", gamePassId, "Transaction failed")
 			return false
@@ -109,8 +109,8 @@ local ShopService = Knit.CreateService({
 		for _, product in ipairs(Products) do
 			if product.ProductId == productId then
 				if product.Rewards and product.Rewards.Coins then
-					local rewardService = Knit.GetService("RewardService")
-					rewardService:AwardCoinsDirect(player, product.Rewards.Coins)
+					local pds = Knit.GetService("PlayerDataService")
+					pds:AddCoins(player, product.Rewards.Coins)
 				end
 				self.Client.OnPurchaseComplete:Fire(player, "Product", productId, {
 					name = product.Name,

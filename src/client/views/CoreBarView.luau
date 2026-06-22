@@ -104,6 +104,7 @@ function CoreBarView.new(screenGui: Instance)
 	self._timeLabel = timeLabel
 	self._trackFill = trackFill
 	self._dots = {}
+	self._waitingMode = false
 
 	local dotSpacing = TRACK_WIDTH / (TOTAL_DOTS - 1)
 
@@ -220,7 +221,56 @@ function CoreBarView:LoadNPCHead(index: number)
 	end
 end
 
+function CoreBarView:SetWaitingMode(neededTrophies: number, nextBatchOffset: number)
+	self._waitingMode = true
+	local label = "Need to win " .. tostring(neededTrophies) .. " World Cup"
+	if neededTrophies > 1 then label = label .. "s" end
+	self._timeLabel.Text = label
+	self._timeLabel.TextSize = 14
+	self._timeLabel.TextXAlignment = Enum.TextXAlignment.Center
+
+	self._trackFill.Size = UDim2.new(0, TRACK_WIDTH, 0, TRACK_HEIGHT)
+
+	for i = 1, TOTAL_DOTS do
+		local entry = self._dots[i]
+		if not entry then continue end
+		entry.vpfOverlay.BackgroundTransparency = 1
+		entry.dot.BackgroundColor3 = Color3.new(0.2, 0.2, 0.35)
+		entry.dot.BackgroundTransparency = 0.1
+		entry.stroke.Color = Color3.new(1, 0.85, 0.1)
+		entry.stroke.Transparency = 0
+		entry.stroke.Thickness = 2
+		entry.vpf.BackgroundColor3 = Color3.new(0.05, 0.05, 0.1)
+		entry.vpf.BackgroundTransparency = 0.1
+		entry.name.TextTransparency = 0
+		entry.name.TextColor3 = Color3.new(1, 1, 1)
+	end
+
+	if nextBatchOffset then
+		self:SetOffset(nextBatchOffset)
+	end
+end
+
+function CoreBarView:SetNormalMode()
+	self._waitingMode = false
+	self._timeLabel.TextSize = 18
+end
+
+function CoreBarView:SetOffset(offset: number)
+	local effectiveOffset = math.max(1, offset)
+	for i = 1, TOTAL_DOTS do
+		local entry = self._dots[i]
+		if not entry then continue end
+		local npcIdx = effectiveOffset + i - 1
+		local npcData = NPCData.NPCList[npcIdx]
+		if npcData then
+			entry.name.Text = npcData.displayName
+		end
+	end
+end
+
 function CoreBarView:UpdateTime(totalSeconds: number)
+	if self._waitingMode then return end
 	local minutes = math.floor(totalSeconds / 60)
 	local seconds = totalSeconds % 60
 	self._timeLabel.Text = string.format("%02d:%02d", minutes, seconds)

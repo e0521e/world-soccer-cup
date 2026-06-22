@@ -1,6 +1,6 @@
 local function createSegment(parent: Instance, xPos: number, icon: string, color: Color3, strokeColor: Color3)
 	local frame = Instance.new("Frame")
-	frame.Size = UDim2.new(0, 110, 0, 28)
+	frame.Size = UDim2.new(0, 110, 1, 0)
 	frame.Position = UDim2.new(0, xPos, 0, 0)
 	frame.BackgroundColor3 = Color3.new(0.04, 0.04, 0.1)
 	frame.BackgroundTransparency = 0.2
@@ -62,7 +62,7 @@ function InfoBarView.new(screenGui: Instance)
 	local bar = Instance.new("Frame")
 	bar.Name = "InfoBar"
 	bar.Size = UDim2.new(0, 342, 0, 34)
-	bar.Position = UDim2.new(0.5, -171, 0, 6)
+	bar.Position = UDim2.new(0.5, -171, 0, 16)
 	bar.BackgroundTransparency = 1
 	bar.BorderSizePixel = 0
 	bar.Parent = screenGui

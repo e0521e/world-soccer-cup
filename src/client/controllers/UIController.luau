@@ -1,5 +1,3 @@
---!strict
-
 local Knit = require(game:GetService("ReplicatedStorage").Packages.Knit)
 local Players = game:GetService("Players")
 local Constants = require(game:GetService("ReplicatedStorage").Shared.constants.Constants)
@@ -34,6 +32,8 @@ local UIController = Knit.CreateController({
 	_toastDelay = 0,
 	_nameTag = nil,
 	_nameTagConn = nil,
+	_tacticalBoardCards = {},
+	_tacticalBoardFilled = false,
 
 	_UpdateNameTag = function(self)
 		if self._nameTagConn then
@@ -61,7 +61,7 @@ local UIController = Knit.CreateController({
 			return
 		end
 
-		local levelInfo = self._reward:GetLevel()
+		local levelInfo = self._pds:GetLevel()
 
 		local gui = Instance.new("BillboardGui")
 		gui.Name = "PlayerNameTag"
@@ -105,15 +105,11 @@ local UIController = Knit.CreateController({
 	end,
 
 	KnitStart = function(self)
-		self._reward = Knit.GetService("RewardService")
+		self._pds = Knit.GetService("PlayerDataService")
 		self._autoKick = Knit.GetService("AutoKickService")
 		self._npcProgress = Knit.GetService("NPCProgressService")
 
-		self._reward.OnCoinsChanged:Connect(function(player, coins, delta)
-			if player ~= Players.LocalPlayer then return end
-		end)
-
-		self._reward.OnLevelUp:Connect(function(player, level, multiplier)
+		self._pds.OnLevelUp:Connect(function(player, level, multiplier)
 			if player ~= Players.LocalPlayer then return end
 			print("[OnLevelUp] level", level, "multiplier", multiplier)
 			self._toast:Show({
@@ -122,9 +118,9 @@ local UIController = Knit.CreateController({
 				body = "Lv." .. tostring(level) .. " (x" .. tostring(multiplier) .. ")",
 				duration = 3,
 			})
-			self._infoBar:UpdateCoins(self._reward:GetCoins())
-			self._infoBar:UpdatePower(self._reward:GetPower())
-			self._infoBar:UpdateTrophies(self._reward:GetTrophies())
+			self._infoBar:UpdateCoins(self._pds:GetCoins())
+			self._infoBar:UpdatePower(self._pds:GetPower())
+			self._infoBar:UpdateTrophies(self._pds:GetTrophies())
 			self:_UpdateNameTag()
 		end)
 
@@ -133,6 +129,7 @@ local UIController = Knit.CreateController({
 		local npcProg = Knit.GetService("NPCProgressService")
 
 		npcProg.OnTimeTick:Connect(function() end)
+		self._pds.OnCoinsChanged:Connect(function() end)
 		ballSpawn.OnBallSpawned:Connect(function() end)
 		ballSpawn.OnBallLanded:Connect(function() end)
 
@@ -167,9 +164,9 @@ local UIController = Knit.CreateController({
 							title = "LEVEL UP!",
 							duration = 3,
 						})
-						self._infoBar:UpdateCoins(self._reward:GetCoins())
-						self._infoBar:UpdatePower(self._reward:GetPower())
-						self._infoBar:UpdateTrophies(self._reward:GetTrophies())
+						self._infoBar:UpdateCoins(self._pds:GetCoins())
+						self._infoBar:UpdatePower(self._pds:GetPower())
+						self._infoBar:UpdateTrophies(self._pds:GetTrophies())
 						self:_UpdateNameTag()
 					elseif messageType == "NotEnough" then
 						self._toast:Show({
@@ -187,24 +184,31 @@ local UIController = Knit.CreateController({
 						self._toast:Show({
 							emoji = "🏆",
 							title = "World Cup",
-							body = "队伍需要11人才能参加世界杯。",
+							body = "Your team needs 10 players to enter.",
 							duration = 3,
 						})
 					elseif messageType == "WorldCupStart" then
 						self._toast:Show({
 							emoji = "🏆",
-							title = "赢得世界杯！",
-							body = "比赛开始...",
+							title = "World Cup!",
+							body = "Match started...",
 							duration = 3,
 						})
 					elseif messageType == "WorldCupDone" then
 						self._toast:Show({
 							emoji = "🏆",
-							title = "世界杯冠军！",
-							body = "奖杯 +1",
+							title = "World Cup Champion!",
+							body = "Trophy +1",
 							duration = 4,
 						})
-						self._infoBar:UpdateTrophies(self._reward:GetTrophies())
+						self._infoBar:UpdateTrophies(self._pds:GetTrophies())
+						self._teamDone = false
+						self._coreBar:SetNormalMode()
+						self:_SetupTacticalBoard()
+						local unlocked = self._pds:GetUnlockedNPCs()
+						local offset = #unlocked + 1
+						self._coreBar:SetOffset(offset)
+						self._coreBar:UpdateTime(0)
 					end
 				end)
 			end
@@ -213,25 +217,36 @@ local UIController = Knit.CreateController({
 		self:_CreateHUD()
 
 		task.spawn(function()
+			local boardRefreshInterval = 0
 			while true do
 				task.wait(1)
 				self._toastDelay = self._toastDelay + 1
 				local totalSeconds = self._npcProgress:GetElapsedTime()
 				self._coreBar:UpdateTime(totalSeconds)
-				local coins = self._reward:GetCoins()
+				local coins = self._pds:GetCoins()
 				self._infoBar:UpdateCoins(coins)
-				local power = self._reward:GetPower()
+				local power = self._pds:GetPower()
 				self._infoBar:UpdatePower(power)
-				local trophies = self._reward:GetTrophies()
+				local trophies = self._pds:GetTrophies()
 				self._infoBar:UpdateTrophies(trophies)
 				local teamCompleteSec = Constants.ONLINE_TOTAL_MINUTES * 60
 				if totalSeconds >= teamCompleteSec and not self._teamDone then
 					self._teamDone = true
+					local trophies = self._pds:GetTrophies()
+					local needed = trophies + 1
+					local unlocked = self._pds:GetUnlockedNPCs()
+					local nextOffset = #unlocked + 1
+					self._coreBar:SetWaitingMode(needed, nextOffset)
 					self._toast:Show({
 						emoji = "🏆",
 						title = "Team Complete!",
 						duration = 3,
 					})
+				end
+				boardRefreshInterval += 1
+				if boardRefreshInterval >= 5 then
+					boardRefreshInterval = 0
+					self:_SetupTacticalBoard()
 				end
 			end
 		end)
@@ -271,9 +286,13 @@ local UIController = Knit.CreateController({
 			})
 		end)
 
-		self._infoBar:UpdateCoins(self._reward:GetCoins())
-		self._infoBar:UpdatePower(self._reward:GetPower())
-		self._infoBar:UpdateTrophies(self._reward:GetTrophies())
+		self._infoBar:UpdateCoins(self._pds:GetCoins())
+		self._infoBar:UpdatePower(self._pds:GetPower())
+		self._infoBar:UpdateTrophies(self._pds:GetTrophies())
+
+		task.spawn(function()
+			self:_SetupTacticalBoard()
+		end)
 
 		task.defer(function()
 			self:_UpdateNameTag()
@@ -282,6 +301,68 @@ local UIController = Knit.CreateController({
 
 	KnitInit = function(self)
 		print("UIController initialized")
+	end,
+
+	_FindTacticalBoard = function(self)
+		local fieldName = Knit.GetService("FieldManagerService"):GetFieldName()
+		local field = workspace:FindFirstChild(fieldName)
+		if not field then return nil end
+		local info = field:FindFirstChild("Info")
+		if not info then return nil end
+		local main = info:FindFirstChild("Main")
+		if not main then return nil end
+		local gui = main:FindFirstChild("Gui")
+		if not gui then return nil end
+		return gui:FindFirstChild("u_card")
+	end,
+
+	_SetupTacticalBoard = function(self)
+		local cardContainer = self:_FindTacticalBoard()
+		if not cardContainer then
+			task.delay(1, function() self:_SetupTacticalBoard() end)
+			return
+		end
+
+		local pds = self._pds
+		local localPlayer = Players.LocalPlayer
+		local userId = localPlayer.UserId
+
+		local card1 = cardContainer:FindFirstChild("card_1")
+		if card1 and card1:IsA("ImageButton") and card1.Image == "" then
+			local bg = card1:FindFirstChild("bg")
+			if bg then bg.Visible = false end
+			local tname = card1:FindFirstChild("t_name")
+			if tname and tname:IsA("TextLabel") then
+				tname.Text = localPlayer.DisplayName
+			end
+			local success, url = pcall(function()
+				return Players:GetUserThumbnailAsync(userId, Enum.ThumbnailType.HeadShot, Enum.ThumbnailSize.Size48x48)
+			end)
+			if success and url ~= "" then
+				card1.Image = url
+			end
+		end
+
+		local unlocked = pds:GetUnlockedNPCs()
+		for i, npcId in ipairs(unlocked) do
+			local cardIdx = i + 1
+			if cardIdx > 11 then break end
+			local card = cardContainer:FindFirstChild("card_" .. tostring(cardIdx))
+			if card and card:IsA("ImageButton") and card.Image == "" then
+				for _, npc in ipairs(NPCData.NPCList) do
+					if npc.id == npcId then
+						local bg = card:FindFirstChild("bg")
+						if bg then bg.Visible = false end
+						local tname = card:FindFirstChild("t_name")
+						if tname and tname:IsA("TextLabel") then
+							tname.Text = npc.displayName
+						end
+						card.Image = npc.icon
+						break
+					end
+				end
+			end
+		end
 	end,
 
 	_SpawnCoinEffect = function(self, startWorldPos)
@@ -341,6 +422,7 @@ local UIController = Knit.CreateController({
 		self._screenGui.Name = "FreeKickHUD"
 		self._screenGui.Parent = Players.LocalPlayer:WaitForChild("PlayerGui")
 		self._screenGui.ResetOnSpawn = false
+		self._screenGui.IgnoreGuiInset = true
 		self._screenGui.ZIndexBehavior = Enum.ZIndexBehavior.Sibling
 
 		self._toast = ToastView.new(self._screenGui)

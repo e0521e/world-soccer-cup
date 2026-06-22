@@ -14,13 +14,36 @@
 
 ### 1.2 核心体验
 
-玩家分配到专属半球场（从 6 个克隆场中），场上按槽位（3 个）轮转出现 10 位球星 NPC，每位头顶倒计时。倒计时归零后 NPC 自动走向最近足球、播放踢球动画、球弧线射入球门。每次进球获得 Coins。整个过程半挂机——玩家无需手动操作射门，可以自由走动，靠近球时自动触发踢球。
+玩家分配到专属半球场，场上按3个站位槽位轮转出现球星NPC。玩家通过在线累积时间逐步解锁84位球星：每当在线进度条达到一个节点，即解锁一个NPC并填充到战术板。全部10人解锁后进入"满员等待"阶段——3个站位槽切换为下一批NPC（无倒计时，头顶提示"赢得世界杯后，我会加入你"），场上仍然正常掉球和踢球。玩家走向场地中央的世界杯奖杯触发比赛，获胜后进度重置、解锁下一批10个NPC，循环直至所有84位球星解锁。
 
 ### 1.3 核心循环
 
 ```txt
-10 NPC 预分配 → 3 槽位错开倒计时(60s/120s/180s) → 到期 NPC 自动走向球 → 踢球 → 进球 → 品质 CD 自动再循环 → 槽位补位 (90s CD)
-10 分钟后 10 NPC + 玩家组成踢球队 → 完成大任务
+阶段 1：解锁阶段
+  → 在线进度条累积（ONLINE_TOTAL_MINUTES）
+  → 每到一个节点（总时间/10），解锁1个球星
+  → 从 NPCList 按顺序取（id=1→10, 11→20, ...）
+  → NPC 头像填充到战术板 card_2~card_11
+  → card_1 始终为本地玩家头像
+  → 场上3个站位槽显示已解锁的 NPC，带倒计时
+
+阶段 2：满员等待
+  → 10人解锁完毕 → 进度条停
+  → 3个站位槽切换为下一批 NPC（11/12/13, 21/22/23...）
+  → 不显示倒计时，NPC 头顶提示 "Win World Cup to join me!"
+  → 场上仍然正常掉球/踢球（NPC参与自动踢球）
+
+阶段 3：世界杯比赛
+  → 玩家走向场地中央的世界杯奖杯（ProximityPrompt，按E触发）
+  → 检查 #UnlockedNPCs >= 10（10 NPC + 玩家 = 11 人队伍）
+  → 不足则提示 "Need 10 players"
+  → 奖杯升起至玩家头顶（1.5s tween），模拟等待（11-20s 随机），奖杯归位
+  → 总是赢 → Trophies+1
+
+阶段 4：下一轮
+  → 进度条重置，继续解锁下一批 10 个球星（id=11→20, 21→30, ...）
+  → 后续每轮解锁的 NPC 也填充到战术板（已有卡片不替换）
+  → 循环至全部 84 人解锁
 ```
 
 ---
@@ -54,7 +77,7 @@
 ### 3.1 游戏状态机
 
 ```txt
-Idle
+Idle → 解锁阶段
   │
   ▼
 3 NPC 倒计时运行（头顶 BillboardGui 显示剩余秒数）
@@ -76,6 +99,15 @@ goal_chk.Touched 检测 → 判定进球
   │
   ▼
 Coins 增加 → 下一 NPC 倒计时开始
+  │
+  ▼ (10 NPC 全部解锁)
+满员等待阶段
+  │
+  ▼ (按E触发ProximityPrompt)
+世界杯比赛阶段：奖杯升起 → 等待11-20s → 奖杯归位 → Trophies+1
+  │
+  ▼
+下一轮：进度重置 → 返回解锁阶段（下一批10个NPC）
 ```
 
 ### 3.2 NPC 倒计时系统
@@ -86,6 +118,7 @@ Coins 增加 → 下一 NPC 倒计时开始
 | 倒计时范围 | 可配置（例：15~30 秒随机） |
 | 显示方式 | 头顶 BillboardGui |
 | 倒计时归零触发 | 玩家自动移至该 NPC |
+| 满员后模式 | 3个站位切换到下一批NPC，无倒计时，提示"Win World Cup to join me!" |
 
 ### 3.3 自动吃球员（Auto Take-over）
 
@@ -159,7 +192,7 @@ NPC 到达球位置后：
 
 ### 4.2 球清单
 
-`ServerStorage.Ball` 下有 45 个球模型（ball1~ball44 + ball422），每次克隆随机取一个。
+`ServerStorage.Ball` 下有 45 个球模型（ball1~ball44 + ball422），根据玩家拥有的球 ID 列表（`BallIds`）随机选一个克隆。
 
 ### 4.3 球生成逻辑
 
@@ -168,7 +201,7 @@ NPC 到达球位置后：
 | 生成间隔 | `BALL_SPAWN_INTERVAL = 6` | 每 6 秒检查一次 |
 | 场上上限 | `MAX_BALLS_ON_FIELD × N` | N = 有场地的玩家人数（至少为 1） |
 | 每轮数量 | N 个 | 每个有场地的玩家各生成 1 个球 |
-| 模板来源 | `ServerStorage.Ball` | 随机选一个球模型克隆 |
+| 模板来源 | `ServerStorage.Ball` | 从玩家 `BallIds` 列表中随机选一个 ID，再取对应球模型克隆 |
 | 下落起点 | Y = 50（`BALL_SPAWN_DROP_HEIGHT`） | 高空掉落 |
 | 落地目标 | Y = 1.0（`BALL_LAND_Y`） | 地面高度 |
 | 下落动画 | 1.5s 缓动 | ease-in-out |
@@ -182,7 +215,7 @@ KnitStart 循环 (每 6s)
   → maxBalls = MAX_BALLS_ON_FIELD * N
   → activeBalls.Count < maxBalls ?
   → 遍历在线玩家，每个有场地者生成 1 个球
-    → ServerStorage.Ball 随机选模板 Clone
+    → 从玩家 BallIds 列表随机选球 ID → ServerStorage.Ball 取对应模型 Clone
     → 随机 dropPos (XZ ±20, Y=50)
     → PivotTo(dropPos) → _WaitForLand(ball)
 ```
@@ -304,15 +337,33 @@ NPC 从 `ServerStorage.Player` 的 4 个子文件夹（Retro/Trending/Popular/Ic
 
 ### 7.1 在线进度条
 
-HUD 顶部展示 `FreeKickHUD.HUD.TimeDotContainer`：
+HUD 底部展示进度条（CoreBarView）：
 
-- 5 个圆点串联金条，每 60s（测试 30s）点亮一个
+- 10 个圆点（DOT）串联金条
 - 时间标签 `MM:SS` 格式，每秒轮询 `NPCProgressService:GetElapsedTime()`
+- 每轮解锁不同 NPC：圆点名称自动随偏移量更新（`CoreBarView:SetOffset(offset)`）
+- 总时长 `ONLINE_TOTAL_MINUTES`（测试 5 分钟）
+- 10 人完全解锁后进度条暂停，等待世界杯胜利后重置
 
 ### 7.2 Coins 展示
 
-`CoinsLabel` 每秒轮询 `RewardService:GetCoins()` 刷新。
-`LevelLabel` 显示 `Lv.X(xY.Y)`，轮询 `RewardService:GetLevel()` 后更新。
+`InfoBarView` 每秒轮询 `PlayerDataService:GetCoins()` 刷新。
+`Level` 和 `Power` 同时显示在 InfoBar。
+
+### 7.3 战术板（Tactical Board）
+
+**位置**：`Workspace.Field_X.Info.Main.Gui.u_card`
+
+**结构**：
+- `card_1` ~ `card_11`（ImageButton）+ `u_bench`（Frame）
+- `card_1` — 本地玩家头像（`Players:GetUserThumbnailAsync` 获取）
+- `card_2` ~ `card_11` — 对应 10 个已解锁 NPC 的 icon（`NPCList[i].icon`）
+- 纯客户端填充：KnitStart 时从 `PlayerDataService.GetUnlockedNPCs()` 读取已解锁列表并设置 Image
+- 世界杯胜利后重新读取解锁列表（已有卡片不重复填充）
+
+**填充时机**：
+1. KnitStart 初始化时
+2. WorldCupDone 事件时（下一轮解锁周期）
 
 ---
 
@@ -396,6 +447,9 @@ HUD 顶部展示 `FreeKickHUD.HUD.TimeDotContainer`：
 | PlayerLevel | PlayerLevel | 当前等级 |
 | NPCQuality | NPCQuality_[npcId] | 各 NPC 的品质等级 |
 | UnlockedCharacters | UnlockedChars | 已解锁球星 ID 列表 |
+| BallIds | BallIds | 已拥有的球模型 ID 列表（默认 `["1"]`） |
+
+> 注：实际存储由 `PlayerDataService` 统一管理，所有字段以 JSON 格式存入 `FreeKickData` DataStore 的 `PlayerData_{userId}` 键下。
 
 ---
 
@@ -407,19 +461,25 @@ HUD 顶部展示 `FreeKickHUD.HUD.TimeDotContainer`：
 
 ### 10.2 球星解锁
 
-| 状态 | 操作 |
+两阶段解锁：
+
+**阶段 A — 进度条解锁**：
+- 每轮通过在线累积时间解锁 10 个 NPC
+- 从 `NPCData.NPCList` 按顺序批量取（第1轮 id=1~10，第2轮 id=11~20，...）
+- 每个 NPC 解锁时填充战术板 card
+
+**阶段 B — 世界杯解锁下一轮**：
+- 10 人全部解锁后，进度暂停
+- 玩家触发世界杯并获胜 → `Trophies+1`
+- `NPCProgressService:ResetProgress(player, offset)` 重置进度并偏移到下一批
+- 循环至全部 84 人解锁
+
+| 参数 | 值 |
 | --------------- | --------------------- |
-| 默认可用 | 1~3 位基础球星（如 Messi, Ronaldo, Neymar） |
-| 金币解锁 | 消耗 Coins 解锁其他球星 |
-| 选择方式 | 通过 UI 角色选择界面 |
-
-### 10.3 解锁费用
-
-| 球星范围 | 解锁费用 |
-| --------------- | ------------- |
-| 基础（默认） | 0 |
-| 明星（4~12） | 各 500 Coins |
-| 传奇（13~24） | 各 1000 Coins |
+| 单轮解锁数 | 10（`ACTIVE_NPC_COUNT`） |
+| 总 NPC 数 | 84 |
+| 总轮数 | 8 轮（80人）+ 剩余4人 |
+| 进度重置时机 | 世界杯胜利后 |
 
 ---
 
@@ -595,6 +655,6 @@ HUD 顶部展示 `FreeKickHUD.HUD.TimeDotContainer`：
 
 ---
 
-文档版本: v1.0
-最后更新: 2026-06-12
+文档版本: v1.1
+最后更新: 2026-06-22
 维护者: (待填写)

@@ -1,5 +1,3 @@
---!strict
-
 local Knit = require(game:GetService("ReplicatedStorage").Packages.Knit)
 local ServerStorage = game:GetService("ServerStorage")
 local Players = game:GetService("Players")
@@ -73,12 +71,12 @@ local FieldManagerService = Knit.CreateService({
 
         print("Zone_LevelUp found in", field.Name, "for", player.Name)
 
-        local rewardService = Knit.GetService("RewardService")
+        local pds = Knit.GetService("PlayerDataService")
 
         task.spawn(function()
             local levelInfo
             for _ = 1, 20 do
-                levelInfo = rewardService:GetLevel(player)
+                levelInfo = pds:GetLevel(player)
                 if levelInfo.loaded then break end
                 task.wait(0.5)
             end
@@ -102,8 +100,8 @@ local FieldManagerService = Knit.CreateService({
             end
         end)
 
-        local mainPart = zone:IsA("BasePart") and zone or zone:FindFirstChildWhichIsA("BasePart")
-        if not mainPart then print("No BasePart in Zone_LevelUp"); return end
+        local mainPart = zone:FindFirstChild("touch")
+        if not mainPart or not mainPart:IsA("BasePart") then print("No touch part in Zone_LevelUp"); return end
 
         print("Touch connected on", mainPart.Name)
 
@@ -120,30 +118,24 @@ local FieldManagerService = Knit.CreateService({
             cd = true
             task.delay(3, function() cd = false end)
 
-            local data = rewardService._playerData[player]
-            local level = data and data.Level or 1
-            local nextConfig = require(game:GetService("ReplicatedStorage").Shared.configs.PlayerLevels)[level + 1]
+            local levelInfo = pds:GetLevel(player)
+            local nextConfig = require(game:GetService("ReplicatedStorage").Shared.configs.PlayerLevels)[levelInfo.level + 1]
             if not nextConfig then
-                print("Already max level")
                 self:_NotifyPlayer(player, "Max Level")
                 return
             end
 
-            local coins = data and data.Coins or 0
-            print("Player coins:", coins, "required:", nextConfig.cost)
-
+            local coins = pds:GetCoins(player)
             if coins < nextConfig.cost then
-                print("Not enough coins")
                 self:_NotifyPlayer(player, "NotEnough")
                 return
             end
 
-            local success = rewardService:UpgradeLevel(player)
-            print("Upgrade result:", success)
+            local success = pds:UpgradeLevel(player)
             if success then
                 self:_NotifyPlayer(player, "Success")
                 self:_PlayUpgradeEffect(mainPart)
-                local newLevelInfo = rewardService:GetLevel(player)
+                local newLevelInfo = pds:GetLevel(player)
                 local info = zone:FindFirstChild("info")
                 if info then
                     local gui = info:FindFirstChild("Gui")
@@ -151,7 +143,6 @@ local FieldManagerService = Knit.CreateService({
                         local tPrice = gui:FindFirstChild("t_price")
                         if tPrice and tPrice:IsA("TextLabel") then
                             tPrice.Text = "💵" .. tostring(newLevelInfo.nextCost)
-                            print("t_price updated to", tPrice.Text)
                         end
                     end
                 end

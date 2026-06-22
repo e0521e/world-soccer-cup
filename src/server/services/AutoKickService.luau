@@ -2,6 +2,7 @@
 
 local Knit = require(game:GetService("ReplicatedStorage").Packages.Knit)
 local Constants = require(game:GetService("ReplicatedStorage").Shared.constants.Constants)
+local KickAnimList = require(game:GetService("ReplicatedStorage").Shared.configs.KickAnimList)
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 
 local AutoKickService = Knit.CreateService({
@@ -109,8 +110,10 @@ local AutoKickService = Knit.CreateService({
         humanoid.AutoRotate = false
         self.Client.OnKickAnimation:Fire(player, slotData.slotId)
 
+        local kickConfig = KickAnimList[math.random(#KickAnimList)]
+
         local anim = Instance.new("Animation")
-        anim.AnimationId = Constants.NPC_KICK_ANIM_ID
+        anim.AnimationId = kickConfig.animId
         local animator = humanoid:FindFirstChildWhichIsA("Animator") or Instance.new("Animator")
         if not animator.Parent then animator.Parent = humanoid end
         local animTrack = animator:LoadAnimation(anim)
@@ -119,7 +122,7 @@ local AutoKickService = Knit.CreateService({
             animTrack:Play()
         end
 
-        task.wait(Constants.KICK_ANIM_TO_FLIGHT_DELAY)
+        task.wait(kickConfig.delay)
         if ball then
             self:_FlyBallToGoal(player, ball, slotData)
         end
@@ -132,16 +135,15 @@ local AutoKickService = Knit.CreateService({
 		if not goal then return end
 		local goalChk = goal:FindFirstChild("goal_chk")
 		if not goalChk then return end
+		local goalChk2 = goalChk:FindFirstChild("goal_chk2")
 
-        local gPos = goalChk.Position
-		local gSize = goalChk.Size
-		local toGoal = Vector3.new(gPos.X, 0, gPos.Z).Unit
-		local offsetDist = 2 + math.random() * 8
-		local targetPos = Vector3.new(
-			gPos.X + toGoal.X * offsetDist,
-			Constants.BALL_LAND_Y + 0.1,
-			gPos.Z + toGoal.Z * offsetDist
-		)
+		local gSize = goalChk2 and goalChk2.Size or goalChk.Size
+		local gCf = (goalChk2 or goalChk).CFrame
+		local rx = (math.random() - 0.5) * gSize.X
+		local rz = (math.random() - 0.5) * gSize.Z
+		local localOffset = Vector3.new(rx, 0, rz)
+		local targetPos = gCf:PointToWorldSpace(localOffset)
+		targetPos = Vector3.new(targetPos.X, Constants.BALL_LAND_Y + 0.1, targetPos.Z)
 		local mainPart = ball:FindFirstChild("Main")
 		if not mainPart then return end
 

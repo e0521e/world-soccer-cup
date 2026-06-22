@@ -20,6 +20,7 @@ local NPCProgressService = Knit.CreateService({
 	},
 
 	_playerData = {},
+	_playerLoops = {},
 
 	GetElapsedTime = function(self, player)
 		local pd = self._playerData[player]
@@ -37,21 +38,37 @@ local NPCProgressService = Knit.CreateService({
 		return table.remove(pd.queue, 1)
 	end,
 
-	_InitPlayer = function(self, player)
+	ResetProgress = function(self, player, startIndex)
+		if self._playerLoops[player] then
+			self._playerLoops[player] = false
+		end
+		self._playerData[player] = nil
+		self:_InitPlayer(player, startIndex or 1)
+	end,
+
+	_InitPlayer = function(self, player, startIndex)
+		if self._playerLoops[player] then
+			self._playerLoops[player] = false
+			task.wait()
+		end
+		startIndex = startIndex or 1
 		local pd = {
 			totalSeconds = 0,
 			minuteCount = 0,
 			queue = {},
 			teamComplete = false,
+			startIndex = startIndex,
 		}
 		self._playerData[player] = pd
+		self._playerLoops[player] = true
+		local active = true
 
 		local totalSecondsLimit = Constants.ONLINE_TOTAL_MINUTES * 60
 		local unlockSlots = Constants.ACTIVE_NPC_COUNT
 		local npcInterval = math.floor(totalSecondsLimit / unlockSlots)
 
 		task.spawn(function()
-			while true do
+			while active and self._playerLoops[player] do
 				task.wait(1)
 				pd.totalSeconds = pd.totalSeconds + 1
 
@@ -59,8 +76,14 @@ local NPCProgressService = Knit.CreateService({
 				if newMin > pd.minuteCount then
 					for i = pd.minuteCount + 1, newMin do
 						if i <= Constants.ACTIVE_NPC_COUNT then
-							table.insert(pd.queue, NPCData.NPCList[i].id)
-							self.Client.OnMinuteReached:Fire(player, i, NPCData.NPCList[i].displayName)
+							local npcIdx = pd.startIndex + i - 1
+							local npcData = NPCData.NPCList[npcIdx]
+							if npcData then
+								table.insert(pd.queue, npcData.id)
+								local pds = Knit.GetService("PlayerDataService")
+								pds:AddUnlockedNPC(player, npcData.id)
+								self.Client.OnMinuteReached:Fire(player, i, npcData.id, npcData.displayName)
+							end
 						end
 					end
 					pd.minuteCount = newMin
@@ -69,6 +92,7 @@ local NPCProgressService = Knit.CreateService({
 				if pd.minuteCount >= Constants.ACTIVE_NPC_COUNT and not pd.teamComplete then
 					pd.teamComplete = true
 					self.Client.OnTeamComplete:Fire(player)
+					break
 				end
 			end
 		end)

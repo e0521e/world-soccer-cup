@@ -1,5 +1,3 @@
---!strict
-
 local Knit = require(game:GetService("ReplicatedStorage").Packages.Knit)
 local NPCData = require(game:GetService("ReplicatedStorage").Shared.configs.NPCData)
 local Constants = require(game:GetService("ReplicatedStorage").Shared.constants.Constants)
@@ -14,6 +12,14 @@ local PlayerService = Knit.CreateService({
 
         SelectNPC = function(self, player, npcId)
             return self.Server:SelectNPC(player, npcId)
+        end,
+
+        GetUnlockedNPCs = function(self, player)
+            return self.Server:GetUnlockedNPCs(player)
+        end,
+
+        GetNPCQuality = function(self, player, npcId)
+            return self.Server:GetNPCQuality(player, npcId)
         end,
 
         OnCharacterChanged = Knit.CreateSignal(),
@@ -123,8 +129,8 @@ local PlayerService = Knit.CreateService({
             local prompt = trophyPart and trophyPart:FindFirstChild("WorldCupPrompt")
             if prompt and prompt:IsA("ProximityPrompt") then
                 prompt.Triggered:Connect(function(player)
-                    local rewardService = Knit.GetService("RewardService")
-                    local unlocked = rewardService:GetUnlockedNPCs(player)
+                    local pds = Knit.GetService("PlayerDataService")
+                    local unlocked = pds:GetUnlockedNPCs(player)
                     if #unlocked < Constants.WORLD_CUP_REQUIRED_NPCS then
                         local noticeEvent = game:GetService("ReplicatedStorage"):FindFirstChild("UpgradeNoticeEvent")
                         if noticeEvent then
@@ -138,11 +144,37 @@ local PlayerService = Knit.CreateService({
                         noticeEvent:FireClient(player, "WorldCupStart")
                     end
 
+                    local trophyMain = trophyPart
+                    local origCF = trophyMain and trophyMain:IsA("BasePart") and trophyMain.CFrame
+
+                    local char = player.Character
+                    local root = char and char:FindFirstChild("HumanoidRootPart")
+                    if origCF and root then
+                        local riseCF = CFrame.new(root.Position.X, root.Position.Y + 15, root.Position.Z)
+                        local tweenService = game:GetService("TweenService")
+                        local riseTween = tweenService:Create(trophyMain, TweenInfo.new(1.5, Enum.EasingStyle.Quad, Enum.EasingDirection.Out), { CFrame = riseCF })
+                        riseTween:Play()
+                        riseTween.Completed:Wait()
+                    end
+
                     local delay = math.random(11, 20)
                     task.wait(delay)
 
-                    rewardService._playerData[player].Trophies += 1
-                    rewardService:_SaveData(player, true)
+                    if origCF then
+                        local tweenService = game:GetService("TweenService")
+                        local returnTween = tweenService:Create(trophyMain, TweenInfo.new(1.5, Enum.EasingStyle.Quad, Enum.EasingDirection.In), { CFrame = origCF })
+                        returnTween:Play()
+                        returnTween.Completed:Wait()
+                    end
+
+                    pds:AddTrophies(player, 1)
+                    pds:SavePlayerData(player)
+
+                    local npcProg = Knit.GetService("NPCProgressService")
+                    local timerService = Knit.GetService("NPCTimerService")
+                    local newOffset = #pds:GetUnlockedNPCs(player) + 1
+                    npcProg:ResetProgress(player, newOffset)
+                    timerService:ActivateNPCs(player, newOffset)
 
                     if noticeEvent then
                         noticeEvent:FireClient(player, "WorldCupDone")

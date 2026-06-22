@@ -1,5 +1,3 @@
---!strict
-
 local Knit = require(game:GetService("ReplicatedStorage").Packages.Knit)
 local AdminData = require(game:GetService("ReplicatedStorage").Shared.configs.AdminData)
 local Players = game:GetService("Players")
@@ -25,24 +23,18 @@ local AdminService = Knit.CreateService({
 	GetPlayerData = function(self, player, targetUserId)
 		if not self:_VerifyAdmin(player) then return nil end
 
-		local rewardService = Knit.GetService("RewardService")
+		local pds = Knit.GetService("PlayerDataService")
 		local target = Players:GetPlayerByUserId(targetUserId)
 		if not target then return nil end
 
 		local data = {
 			UserId = targetUserId,
 			Name = target.Name,
-			Coins = rewardService:GetCoins(target),
-			Level = rewardService:GetLevel(target),
+			Coins = pds:GetCoins(target),
+			Level = pds:GetLevel(target),
 		}
 
-		local raw = nil
-		local ok, rawData = pcall(function()
-			return rewardService._playerData[target]
-		end)
-		if ok and rawData then
-			raw = rawData
-		end
+		local raw = pds:GetData(target)
 
 		return data, raw
 	end,
@@ -50,11 +42,11 @@ local AdminService = Knit.CreateService({
 	SetPlayerData = function(self, player, targetUserId, keyValues)
 		if not self:_VerifyAdmin(player) then return false end
 
-		local rewardService = Knit.GetService("RewardService")
+		local pds = Knit.GetService("PlayerDataService")
 		local target = Players:GetPlayerByUserId(targetUserId)
 		if not target then return false end
 
-		local data = rewardService._playerData[target]
+		local data = pds:GetData(target)
 		if not data then return false end
 
 		local ok, err = pcall(function()
@@ -67,7 +59,7 @@ local AdminService = Knit.CreateService({
 			return false
 		end
 
-		rewardService:_SaveData(target, true)
+		pds:SavePlayerData(target)
 		return true
 	end,
 

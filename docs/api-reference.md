@@ -118,40 +118,34 @@
 
 **文件路径**: `src/server/services/RewardService.luau`
 
-**简述**: 管理玩家金币结算、等级系统、NPC 品质管理、DataStore 持久化以及 NPC 解锁。
+**简述**: 奖励计算逻辑（金币公式、NPC 解锁/品质提升），所有持久化数据操作委托给 `PlayerDataService`。
 
 #### 1.3.1 公开方法（Client 表）
 
 | 方法 | 参数 | 返回值 | 权限 | 说明 |
 | ---- | ---- | ------ | ---- | ---- |
-| GetCoins | `()` | `number` | Client | 获取当前玩家金币余额 |
-| GetLevel | `()` | `{level: number, multiplier: number, nextCost: number}` | Client | 获取当前等级信息 |
-| UpgradeLevel | `()` | `boolean` | Client | 消耗 Coins 升级（自动扣除） |
-| GetNPCQuality | `(npcId: string)` | `{quality: number, multiplier: number}` | Client | 获取指定 NPC 品质 |
-| GetUnlockedNPCs | `()` | `{string}` | Client | 获取已解锁的 NPC ID 列表 |
-| DeductCoins | `(amount: number)` | `boolean` | Client | 扣减金币（ShopService 调用，外部慎用） |
+| GetNPCQuality | `(npcId: string)` | `{quality: number, multiplier: number}` | Client | 获取指定 NPC 品质（委托 PlayerDataService） |
+| GetUnlockedNPCs | `()` | `{string}` | Client | 获取已解锁的 NPC ID 列表（委托 PlayerDataService） |
+| UnlockNPC | `(npcId: string, cost: number)` | `boolean` | Client | 消耗金币解锁 NPC，委托 PlayerDataService 操作数据 |
 
 #### 1.3.2 信号
 
 | 信号 | 参数 | 触发时机 | 说明 |
 | ---- | ---- | -------- | ---- |
-| OnCoinsChanged | `(newBalance: number, delta: number)` | 金币增减 | 每次金币变化后广播 |
-| OnLevelUp | `(newLevel: number, multiplier: number)` | 等级提升 | 玩家升级成功 |
 | OnNPCQualityUp | `(npcId: string, newQuality: number, multiplier: number)` | NPC 品质提升 | NPC 品质变化（重生或购买） |
 | OnNPCUnlocked | `(npcId: string, cost: number)` | NPC 解锁成功 | 玩家消耗金币解锁新 NPC |
+
+> **注意**：金币和等级相关信号已移至 `PlayerDataService`（`OnCoinsChanged`、`OnLevelUp`）。
 
 #### 1.3.3 内部方法
 
 | 方法 | 参数 | 返回值 | 说明 |
 | ---- | ---- | ------ | ---- |
-| DeductCoins | `(player: Player, amount: number)` | `boolean` | 扣减金币，触发 OnCoinsChanged |
-| AwardCoinsDirect | `(player: Player, amount: number)` | `()` | 直接增加金币（用于开发者产品购买奖励） |
-| _AwardCoins | `(player: Player, amount: number)` | `()` | 增加金币，触发 OnCoinsChanged |
-| _CalculateReward | `(player: Player, npcId: string)` | `number` | 按公式计算实际金币：BASE × 等级倍率 × NPC 品质倍率 |
-| _UpgradeNPCQuality | `(player: Player, npcId: string)` | `()` | 重生后提升 NPC 品质 +1（上限 5） |
-| _SaveData | `(player: Player)` | `()` | 将 Coins / Level / NPCTiers / UnlockedNPCs 写入 DataStore |
-| _LoadData | `(player: Player)` | `()` | 从 DataStore 读取玩家存档初始化内存 |
-| UnlockNPC | `(player: Player, npcId: string, cost: number)` | `boolean` | 扣除金币解锁 NPC，触发 OnNPCUnlocked |
+| AwardGoal | `(player: Player, npcId: string)` | `()` | 按公式计算金币并发放，检查 Double Coins GamePass |
+| UnlockNPC | `(player: Player, npcId: string, cost: number)` | `boolean` | 扣除金币解锁 NPC，委托 PlayerDataService 操作数据 |
+| UpgradeNPCQuality | `(player: Player, npcId: string)` | `()` | NPC 品质 +1（上限 MAX_NPC_QUALITY），委托 PlayerDataService |
+| GetNPCQuality | `(player: Player, npcId: string)` | `number` | 查询 NPC 品质（委托 PlayerDataService） |
+| GetUnlockedNPCs | `(player: Player)` | `{string}` | 查询已解锁 NPC 列表（委托 PlayerDataService） |
 
 **奖励规则**:
 
@@ -165,7 +159,59 @@
 
 ---
 
-### 1.4 PlayerService
+### 1.4 PlayerDataService
+
+**文件路径**: `src/server/services/PlayerDataService.luau`
+
+**简述**: 玩家数据单一数据源。所有持久化玩家数据的 CRUD 操作、DataStore 读写，是 Coins / Level / NPCTiers / UnlockedNPCs / BallIds / Trophies 的权威来源。
+
+#### 1.4.1 公开方法（Client 表）
+
+| 方法 | 参数 | 返回值 | 权限 | 说明 |
+| ---- | ---- | ------ | ---- | ---- |
+| GetCoins | `()` | `number` | Client | 获取当前玩家金币余额 |
+| GetLevel | `()` | `{level: number, multiplier: number, nextCost: number}` | Client | 获取当前等级信息 |
+| GetPower | `()` | `number` | Client | 获取战力值 |
+| GetTrophies | `()` | `number` | Client | 获取奖杯数 |
+| GetBallIds | `()` | `{string}` | Client | 获取已拥有的球模型 ID 列表 |
+| IsNewPlayer | `()` | `boolean` | Client | 是否新玩家 |
+| CompleteTutorial | `()` | `boolean` | Client | 完成新手引导 |
+| UpgradeLevel | `()` | `boolean` | Client | 消耗 Coins 升级（自动扣除） |
+
+#### 1.4.2 信号
+
+| 信号 | 参数 | 触发时机 | 说明 |
+| ---- | ---- | -------- | ---- |
+| OnCoinsChanged | `(newBalance: number, delta: number)` | 金币增减 | 每次金币变化后广播 |
+| OnLevelUp | `(newLevel: number, multiplier: number)` | 等级提升 | 玩家升级成功 |
+
+#### 1.4.3 内部方法
+
+| 方法 | 参数 | 返回值 | 说明 |
+| ---- | ---- | ------ | ---- |
+| LoadPlayerData | `(player: Player)` | `()` | 从 DataStore 读取或创建默认 PlayerData |
+| SavePlayerData | `(player: Player)` | `()` | 强制保存到 DataStore |
+| GetCoins | `(player: Player)` | `number` | 获取金币余额 |
+| SetCoins | `(player: Player, amount: number)` | `()` | 直接设置金币 |
+| AddCoins | `(player: Player, delta: number)` | `()` | 增加金币，触发 OnCoinsChanged |
+| DeductCoins | `(player: Player, amount: number)` | `boolean` | 扣减金币，触发 OnCoinsChanged |
+| GetLevel | `(player: Player)` | `table` | 获取等级信息 |
+| UpgradeLevel | `(player: Player)` | `boolean` | 升级逻辑（检查→扣减→升级→触发信号） |
+| GetPower | `(player: Player)` | `number` | 计算战力 |
+| GetTrophies | `(player: Player)` | `number` | 获取奖杯数 |
+| AddTrophies | `(player: Player, delta: number)` | `()` | 增加奖杯 |
+| GetBallIds | `(player: Player)` | `{string}` | 获取球 ID 列表 |
+| AddBallId | `(player: Player, ballId: string)` | `()` | 增加球 ID |
+| GetNPCQuality | `(player: Player, npcId: string)` | `number` | 获取 NPC 品质 |
+| SetNPCQuality | `(player: Player, npcId: string, quality: number)` | `()` | 设置 NPC 品质 |
+| GetUnlockedNPCs | `(player: Player)` | `{string}` | 获取已解锁 NPC |
+| AddUnlockedNPC | `(player: Player, npcId: string)` | `()` | 增加已解锁 NPC |
+| GetData | `(player: Player)` | `table?` | 返回完整 PlayerData 引用（AdminService 用） |
+| ResolveMatch | `(player: Player, targetUserId: number)` | `table` | 战力对决 |
+
+---
+
+### 1.5 PlayerService
 
 **文件路径**: `src/server/services/PlayerService.luau`
 
@@ -195,7 +241,7 @@
 
 ---
 
-### 1.5 FieldManagerService
+### 1.6 FieldManagerService
 
 **文件路径**: `src/server/services/FieldManagerService.luau`
 
@@ -221,7 +267,7 @@
 
 ---
 
-### 1.6 NPCProgressService
+### 1.7 NPCProgressService
 
 **文件路径**: `src/server/services/NPCProgressService.luau`
 
@@ -243,7 +289,7 @@
 
 ---
 
-### 1.7 ShopService
+### 1.8 ShopService
 
 **文件路径**: `src/server/services/ShopService.luau`
 
@@ -306,7 +352,7 @@ Client (ShopView)                    Server (ShopService)
 
 ---
 
-### 1.8 MusicService
+### 1.9 MusicService
 
 **文件路径**: `src/server/services/MusicService.luau`
 
@@ -432,6 +478,7 @@ export type PlayerData = {
     Level: number,
     NPCTiers: { [string]: number },  -- npcId → quality level 1~5
     UnlockedNPCs: { string },
+    BallIds: { string },  -- 已拥有的球模型 ID 列表（默认 ["1"]）
 }
 
 export type NPCSlotInfo = {

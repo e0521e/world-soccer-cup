@@ -136,10 +136,10 @@ local TutorialController = Knit.CreateController({
 	_running = false,
 
 	KnitStart = function(self)
-		local reward = Knit.GetService("RewardService")
+		local pds = Knit.GetService("PlayerDataService")
 		local isNew = false
 		for i = 1, 20 do
-			isNew = reward:IsNewPlayer()
+			isNew = pds:IsNewPlayer()
 			if isNew then break end
 			task.wait(0.5)
 		end
@@ -157,7 +157,7 @@ local TutorialController = Knit.CreateController({
 	_RunTutorial = function(self)
 		print("[Tutorial] _RunTutorial started")
 		local player = Players.LocalPlayer
-		local reward = Knit.GetService("RewardService")
+		local pds = Knit.GetService("PlayerDataService")
 		local upgradeEvent = ReplicatedStorage:FindFirstChild("UpgradeNoticeEvent")
 		local coinEvent = ReplicatedStorage:FindFirstChild("CoinEffectEvent")
 		print("[Tutorial] upgradeEvent:", upgradeEvent, "coinEvent:", coinEvent)
@@ -320,7 +320,7 @@ local TutorialController = Knit.CreateController({
 			destroyArrow(arrow)
 		end
 
-		reward:CompleteTutorial()
+		pds:CompleteTutorial()
 		self._running = false
 	end,
 
