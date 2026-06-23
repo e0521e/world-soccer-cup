@@ -3,7 +3,6 @@
 local Knit = require(game:GetService("ReplicatedStorage").Packages.Knit)
 local Constants = require(game:GetService("ReplicatedStorage").Shared.constants.Constants)
 local KickAnimList = require(game:GetService("ReplicatedStorage").Shared.configs.KickAnimList)
-local TweenService = game:GetService("TweenService")
 local ServerStorage = game:GetService("ServerStorage")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 
@@ -19,7 +18,48 @@ local BallSpawnService = Knit.CreateService({
     },
 
     _activeBalls = {},
-    _spawnTimer = nil,
+    _playerLoops = {},
+
+    _GetPlayerBallCount = function(self, player)
+        local count = 0
+        for _, data in pairs(self._activeBalls) do
+            if data.player == player then count += 1 end
+        end
+        return count
+    end,
+
+    _GetPlayerBallCap = function(self, player)
+        local pds = Knit.GetService("PlayerDataService")
+        local unlocked = pds:GetUnlockedNPCs(player)
+        return math.max(3, #unlocked)
+    end,
+
+    _StartPlayerLoop = function(self, player)
+        self._playerLoops[player] = true
+        task.spawn(function()
+            local Players = game:GetService("Players")
+            while self._playerLoops[player] and Players:FindFirstChild(player.Name) do
+                local field = Knit.GetService("FieldManagerService"):GetField(player)
+                if field then
+                    local cap = self:_GetPlayerBallCap(player)
+                    local current = self:_GetPlayerBallCount(player)
+                    if current < cap then
+                        self:SpawnBall(field, player)
+                        current += 1
+                    end
+                    local gap = cap - current
+                    local interval = math.max(1, Constants.BALL_SPAWN_INTERVAL - math.floor(gap / 2))
+                    task.wait(interval)
+                else
+                    task.wait(Constants.BALL_SPAWN_INTERVAL)
+                end
+            end
+        end)
+    end,
+
+    _StopPlayerLoop = function(self, player)
+        self._playerLoops[player] = false
+    end,
 
     SpawnBall = function(self, field, player)
         local ballFolder = ServerStorage:FindFirstChild("Ball")
@@ -72,6 +112,7 @@ local BallSpawnService = Knit.CreateService({
         end
 
         self._activeBalls[ball] = {
+            player = player,
             model = ball,
             mainPart = mainPart,
             inUse = false,
@@ -292,33 +333,32 @@ local BallSpawnService = Knit.CreateService({
     end,
 
     KnitStart = function(self)
-        local fieldMgr = Knit.GetService("FieldManagerService")
-        task.spawn(function()
-            while true do
-                task.wait(Constants.BALL_SPAWN_INTERVAL)
-                local players = game:GetService("Players"):GetPlayers()
-                local activeFieldCount = 0
-                for _, player in ipairs(players) do
-                    if fieldMgr:GetField(player) then
-                        activeFieldCount += 1
-                    end
-                end
-                local maxBalls = Constants.MAX_BALLS_ON_FIELD * math.max(activeFieldCount, 1)
+        local Players = game:GetService("Players")
 
-                local totalBalls = 0
-                for _ in pairs(self._activeBalls) do
-                    totalBalls += 1
-                end
-                if totalBalls >= maxBalls then continue end
+        Players.PlayerAdded:Connect(function(player)
+            task.spawn(function()
+                repeat task.wait(0.5) until player.Character
+                self:_StartPlayerLoop(player)
+            end)
+        end)
 
-                for _, player in ipairs(players) do
-                    local field = fieldMgr:GetField(player)
-                    if field then
-                        self:SpawnBall(field, player)
-                    end
+        Players.PlayerRemoving:Connect(function(player)
+            self:_StopPlayerLoop(player)
+            for ball, data in pairs(self._activeBalls) do
+                if data.player == player then
+                    if ball.Parent then ball:Destroy() end
+                    self._activeBalls[ball] = nil
                 end
             end
         end)
+
+        for _, player in ipairs(Players:GetPlayers()) do
+            task.spawn(function()
+                repeat task.wait(0.5) until player.Character
+                self:_StartPlayerLoop(player)
+            end)
+        end
+
         print("BallSpawnService started")
     end,
 })

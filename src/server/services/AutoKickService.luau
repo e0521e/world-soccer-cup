@@ -126,6 +126,21 @@ local AutoKickService = Knit.CreateService({
         if ball then
             self:_FlyBallToGoal(player, ball, slotData)
         end
+
+        local primary = npcModel:FindFirstChild("HumanoidRootPart")
+        if primary then
+            local field = Knit.GetService("FieldManagerService"):GetField(player)
+            local goal = field and field:FindFirstChild("_door")
+            if goal then
+                local goalPos = goal:GetPivot().Position
+                local npcPos = primary.Position
+                local lookDir = (Vector3.new(goalPos.X, 0, goalPos.Z) - Vector3.new(npcPos.X, 0, npcPos.Z)).Unit
+                if lookDir.Magnitude > 0 then
+                    primary.CFrame = CFrame.lookAt(primary.Position, primary.Position + lookDir)
+                end
+            end
+        end
+        humanoid.AutoRotate = true
     end,
 
     _FlyBallToGoal = function(self, player, ball, slotData)

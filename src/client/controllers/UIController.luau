@@ -473,6 +473,7 @@ local UIController = Knit.CreateController({
 		for i = 1, Constants.ACTIVE_NPC_COUNT do
 			self._coreBar:LoadNPCHead(i)
 		end
+
 	end,
 })
 

@@ -4,6 +4,8 @@ local PlayerLevels = require(game:GetService("ReplicatedStorage").Shared.configs
 local NPCData = require(game:GetService("ReplicatedStorage").Shared.configs.NPCData)
 local DataStoreService = game:GetService("DataStoreService")
 
+local SAVE_INTERVAL = 120
+
 local PlayerDataService = Knit.CreateService({
 	Name = "PlayerDataService",
 
@@ -51,6 +53,7 @@ local PlayerDataService = Knit.CreateService({
 	_playerData = {},
 	_dataStore = nil,
 	_lastSave = {},
+	_dirty = {},
 
 	LoadPlayerData = function(self, player)
 		local loaded = false
@@ -84,15 +87,23 @@ local PlayerDataService = Knit.CreateService({
 		end
 	end,
 
-	_SaveData = function(self, player, force)
+	_MarkDirty = function(self, player)
+		self._dirty[player] = true
+	end,
+
+	_ThrottledSave = function(self, player)
 		if not self._dataStore then return end
 		local data = self._playerData[player]
 		if not data then return end
 
 		local now = tick()
 		local last = self._lastSave[player] or 0
-		if not force and (now - last) < 60 then return end
+		if (now - last) < SAVE_INTERVAL then
+			self:_MarkDirty(player)
+			return
+		end
 		self._lastSave[player] = now
+		self._dirty[player] = nil
 
 		local userId = player.UserId
 		local key = Constants.DATASTORE_KEY .. tostring(userId)
@@ -102,15 +113,40 @@ local PlayerDataService = Knit.CreateService({
 		end)
 		if not success then
 			warn("PlayerDataService: failed to save for", player.Name, err)
+			self:_MarkDirty(player)
+		end
+	end,
+
+	_FlushDirty = function(self)
+		for player in pairs(self._dirty) do
+			local data = self._playerData[player]
+			if data then
+				self._lastSave[player] = tick()
+				self._dirty[player] = nil
+
+				local userId = player.UserId
+				local key = Constants.DATASTORE_KEY .. tostring(userId)
+
+				local success, err = pcall(function()
+					self._dataStore:SetAsync(key, data)
+				end)
+				if not success then
+					warn("PlayerDataService: failed to flush for", player.Name, err)
+					self._dirty[player] = true
+				end
+			end
 		end
 	end,
 
 	SavePlayerData = function(self, player)
-		self:_SaveData(player, true)
+		self:_MarkDirty(player)
+		self:_FlushDirty()
 	end,
 
 	OnPlayerRemoving = function(self, player)
-		self:_SaveData(player, true)
+		self._lastSave[player] = 0
+		self:_ThrottledSave(player)
+		self._dirty[player] = nil
 		self._playerData[player] = nil
 		self._lastSave[player] = nil
 	end,
@@ -175,7 +211,7 @@ local PlayerDataService = Knit.CreateService({
 		local levelConfig = PlayerLevels[data.Level]
 		self.Client.OnCoinsChanged:Fire(player, data.Coins, -nextConfig.cost)
 		self.Client.OnLevelUp:Fire(player, data.Level, levelConfig.multiplier)
-		self:_SaveData(player)
+		self:_MarkDirty(player)
 
 		return true
 	end,
@@ -215,7 +251,7 @@ local PlayerDataService = Knit.CreateService({
 		local data = self._playerData[player]
 		if not data then return end
 		table.insert(data.BallIds, ballId)
-		self:_SaveData(player)
+		self:_MarkDirty(player)
 	end,
 
 	GetTrophies = function(self, player)
@@ -246,7 +282,7 @@ local PlayerDataService = Knit.CreateService({
 		local data = self._playerData[player]
 		if data then
 			data.New = false
-			self:_SaveData(player, true)
+			self:_MarkDirty(player)
 			return true
 		end
 		return false
@@ -320,16 +356,31 @@ local PlayerDataService = Knit.CreateService({
 	end,
 
 	KnitStart = function(self)
-		game:GetService("Players").PlayerAdded:Connect(function(player)
+		local Players = game:GetService("Players")
+
+		Players.PlayerAdded:Connect(function(player)
 			self:LoadPlayerData(player)
 		end)
-		game:GetService("Players").PlayerRemoving:Connect(function(player)
+
+		Players.PlayerRemoving:Connect(function(player)
 			self:OnPlayerRemoving(player)
 		end)
 
-		for _, player in ipairs(game:GetService("Players"):GetPlayers()) do
-			self:LoadPlayerData(player)
+		for i, player in ipairs(Players:GetPlayers()) do
+			task.spawn(function()
+				if i > 1 then task.wait(0.5) end
+				self:LoadPlayerData(player)
+			end)
 		end
+
+		task.spawn(function()
+			while self._dataStore do
+				task.wait(SAVE_INTERVAL)
+				for player in pairs(self._dirty) do
+					self:_ThrottledSave(player)
+				end
+			end
+		end)
 
 		print("PlayerDataService started")
 	end,

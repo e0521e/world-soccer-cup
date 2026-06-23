@@ -134,7 +134,7 @@ local FieldManagerService = Knit.CreateService({
             local success = pds:UpgradeLevel(player)
             if success then
                 self:_NotifyPlayer(player, "Success")
-                self:_PlayUpgradeEffect(mainPart)
+                self:_PlayUpgradeEffect(player)
                 local newLevelInfo = pds:GetLevel(player)
                 local info = zone:FindFirstChild("info")
                 if info then
@@ -157,50 +157,35 @@ local FieldManagerService = Knit.CreateService({
         end
     end,
 
-    _PlayUpgradeEffect = function(self, part)
-        local attachment = Instance.new("Attachment")
-        attachment.Parent = part
+    _PlayUpgradeEffect = function(self, player)
+        local effFolder = game:GetService("ServerStorage"):FindFirstChild("Eff")
+        if not effFolder then return end
+        local template = effFolder:FindFirstChild("Upgrade")
+        if not template then return end
 
-        local emitter = Instance.new("ParticleEmitter")
-        emitter.Parent = attachment
-        emitter.Texture = "rbxasset://textures/particles/sparkles_main.dds"
-        emitter.Color = ColorSequence.new({
-            ColorSequenceKeypoint.new(0, Color3.new(1, 1, 0.5)),
-            ColorSequenceKeypoint.new(0.5, Color3.new(1, 0.8, 0)),
-            ColorSequenceKeypoint.new(1, Color3.new(1, 0.4, 0)),
-        })
-        emitter.Lifetime = NumberRange.new(1.5, 3)
-        emitter.Rate = 60
-        emitter.SpreadAngle = Vector2.new(0, 360)
-        emitter.Speed = NumberRange.new(5, 12)
-        emitter.Acceleration = Vector3.new(0, -3, 0)
-        emitter.Enabled = true
+        local char = player.Character
+        if not char then return end
+        local root = char:FindFirstChild("HumanoidRootPart")
+        if not root then return end
 
-        local beamAttach = Instance.new("Attachment")
-        beamAttach.Name = "BeamAttach"
-        beamAttach.Position = Vector3.new(0, 3, 0)
-        beamAttach.Parent = part
+        local effect = template:Clone()
+        effect.Parent = char
+        effect.CFrame = root.CFrame
 
-        local beam = Instance.new("Beam")
-        beam.Parent = part
-        beam.Attachment0 = attachment
-        beam.Attachment1 = beamAttach
-        beam.Color = ColorSequence.new(Color3.new(1, 0.9, 0.1))
-        beam.LightEmission = 1
-        beam.Texture = "rbxasset://textures/particles/sparkles_main.dds"
-        beam.TextureLength = 2
-        beam.TextureSpeed = 1
-        beam.Transparency = NumberSequence.new(0.3)
-        beam.Width0 = 2
-        beam.Width1 = 0.5
+        for _, child in ipairs(effect:GetDescendants()) do
+            if child:IsA("ParticleEmitter") then
+                child.Enabled = true
+            end
+        end
 
-        task.delay(3, function()
-            emitter.Enabled = false
+        task.delay(5, function()
+            for _, child in ipairs(effect:GetDescendants()) do
+                if child:IsA("ParticleEmitter") then
+                    child.Enabled = false
+                end
+            end
             task.delay(2, function()
-                emitter:Destroy()
-                attachment:Destroy()
-                beam:Destroy()
-                beamAttach:Destroy()
+                effect:Destroy()
             end)
         end)
     end,
