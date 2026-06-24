@@ -2,6 +2,7 @@ local Knit = require(game:GetService("ReplicatedStorage").Packages.Knit)
 local Players = game:GetService("Players")
 local Workspace = game:GetService("Workspace")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
+local TutorialData = require(game:GetService("ReplicatedStorage").Shared.configs.TutorialData)
 
 local function findField()
 	local player = Players.LocalPlayer
@@ -186,7 +187,7 @@ local TutorialController = Knit.CreateController({
 		end
 		print("[Tutorial] nearest ball:", ball)
 		if ball then
-			local arrow = createBeamArrow(ball.Position, "⚽ 踢球射门开始游戏")
+			local arrow = createBeamArrow(ball.Position, TutorialData.Steps[1].text)
 			local kicked = false
 			local conn
 			if coinEvent then
@@ -202,7 +203,7 @@ local TutorialController = Knit.CreateController({
 					ball = findNearestBall()
 					if ball then
 						destroyArrow(arrow)
-						arrow = createBeamArrow(ball.Position, "⚽ 踢球射门开始游戏")
+						arrow = createBeamArrow(ball.Position, TutorialData.Steps[1].text)
 					end
 				end
 			end
@@ -224,7 +225,7 @@ local TutorialController = Knit.CreateController({
 		end
 		print("[Tutorial] npcRoot:", npcRoot)
 		if npcRoot then
-			local arrow = createBeamArrow(npcRoot.Position + Vector3.new(0, 2, 0), "👤 靠近球员，他将加入你的队伍")
+			local arrow = createBeamArrow(npcRoot.Position + Vector3.new(0, 2, 0), TutorialData.Steps[2].text)
 			local near = false
 			local timeout = 30
 			while timeout > 0 and not near do
@@ -249,7 +250,7 @@ local TutorialController = Knit.CreateController({
 		local zone = field and field:FindFirstChild("Zone_LevelUp")
 		local zonePart = zone and (zone:IsA("BasePart") and zone or zone:FindFirstChildWhichIsA("BasePart"))
 		if zonePart then
-			local arrow = createBeamArrow(zonePart.Position, "⬆ 触碰升级区域提升等级")
+			local arrow = createBeamArrow(zonePart.Position, TutorialData.Steps[3].text)
 			local upgraded = false
 			local conn
 			if upgradeEvent then
@@ -272,7 +273,7 @@ local TutorialController = Knit.CreateController({
 		local trophyModel = Workspace:FindFirstChild("trophy")
 		local trophyPart = trophyModel and trophyModel:FindFirstChild("Main")
 		if trophyPart then
-			local arrow = createBeamArrow(trophyPart.Position, "🏆 触摸世界杯奖杯参赛")
+			local arrow = createBeamArrow(trophyPart.Position, TutorialData.Steps[4].text)
 			local triggered = false
 			local conn
 			if upgradeEvent then
@@ -296,7 +297,7 @@ local TutorialController = Knit.CreateController({
 		---- Step 5: Kick again ----
 		local ball = findNearestBall()
 		if ball then
-			local arrow = createBeamArrow(ball.Position, "⚽ 再踢一球完成引导")
+			local arrow = createBeamArrow(ball.Position, TutorialData.Steps[5].text)
 			local kicked = false
 			local conn
 			if coinEvent then
@@ -312,7 +313,7 @@ local TutorialController = Knit.CreateController({
 					ball = findNearestBall()
 					if ball then
 						destroyArrow(arrow)
-						arrow = createBeamArrow(ball.Position, "⚽ 再踢一球完成引导")
+						arrow = createBeamArrow(ball.Position, TutorialData.Steps[5].text)
 					end
 				end
 			end

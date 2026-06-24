@@ -6,14 +6,14 @@ local UNLOCK_SLOTS = TOTAL_DOTS
 local NPC_UNLOCK_INTERVAL = math.floor(Constants.ONLINE_TOTAL_MINUTES * 60 / UNLOCK_SLOTS)
 local TOTAL_DURATION = Constants.ONLINE_TOTAL_MINUTES * 60
 
-local DOT_SIZE = 50
-local BAR_WIDTH = 860
-local BAR_HEIGHT = 110
-local DOT_Y = 16
-local TRACK_Y = 84
-local TRACK_HEIGHT = 14
-local TRACK_PAD = 50
-local TRACK_WIDTH = BAR_WIDTH - TRACK_PAD * 2
+local BAR_HEIGHT_SCALE = 0.1
+local TRACK_WIDTH_SCALE = 0.82
+local DOT_SIZE_SCALE = 0.055
+local DOT_Y_SCALE = 0.5
+local TRACK_Y_SCALE = 0.88
+local TRACK_HEIGHT_SCALE = 0.12
+local DOT_GAP_SCALE = TRACK_WIDTH_SCALE / (TOTAL_DOTS - 1)
+local TRACK_LEFT_SCALE = (1 - TRACK_WIDTH_SCALE) / 2
 
 local CoreBarView = {}
 CoreBarView.__index = CoreBarView
@@ -23,8 +23,9 @@ function CoreBarView.new(screenGui: Instance)
 
 	local bar = Instance.new("Frame")
 	bar.Name = "CoreBar"
-	bar.Size = UDim2.new(0, BAR_WIDTH, 0, BAR_HEIGHT)
-	bar.Position = UDim2.new(0.5, -BAR_WIDTH / 2, 1, -BAR_HEIGHT - 10)
+	bar.AnchorPoint = Vector2.new(0.5, 1)
+	bar.Size = UDim2.new(0.8, 0, BAR_HEIGHT_SCALE, 0)
+	bar.Position = UDim2.new(0.5, 0, 1, 0)
 	bar.BackgroundColor3 = Color3.new(0.04, 0.04, 0.1)
 	bar.BackgroundTransparency = 0.15
 	bar.BorderSizePixel = 0
@@ -51,13 +52,14 @@ function CoreBarView.new(screenGui: Instance)
 
 	local timeLabel = Instance.new("TextLabel")
 	timeLabel.Name = "TimerLabel"
-	timeLabel.Size = UDim2.new(0, 100, 0, 16)
-	timeLabel.Position = UDim2.new(0.5, -50, 0, TRACK_Y - 2)
+	timeLabel.AnchorPoint = Vector2.new(0.5, 0.5)
+	timeLabel.Size = UDim2.new(0.22, 0, 0.15, 0)
+	timeLabel.Position = UDim2.new(0.5, 0, 0.56, 0)
 	timeLabel.BackgroundTransparency = 1
 	timeLabel.TextColor3 = Color3.new(1, 1, 1)
 	timeLabel.TextStrokeTransparency = 0.15
 	timeLabel.TextStrokeColor3 = Color3.new(0, 0, 0)
-	timeLabel.TextSize = 18
+	timeLabel.TextScaled = true
 	timeLabel.Font = Enum.Font.GothamBold
 	timeLabel.ZIndex = 10
 	timeLabel.TextXAlignment = Enum.TextXAlignment.Center
@@ -66,8 +68,9 @@ function CoreBarView.new(screenGui: Instance)
 
 	local trackBg = Instance.new("Frame")
 	trackBg.Name = "TrackBg"
-	trackBg.Size = UDim2.new(0, TRACK_WIDTH, 0, TRACK_HEIGHT)
-	trackBg.Position = UDim2.new(0, TRACK_PAD, 0, TRACK_Y)
+	trackBg.AnchorPoint = Vector2.new(0.5, 0.5)
+	trackBg.Size = UDim2.new(TRACK_WIDTH_SCALE, 0, TRACK_HEIGHT_SCALE, 0)
+	trackBg.Position = UDim2.new(0.5, 0, TRACK_Y_SCALE, 0)
 	trackBg.BackgroundColor3 = Color3.new(0.12, 0.12, 0.2)
 	trackBg.BackgroundTransparency = 0.15
 	trackBg.BorderSizePixel = 0
@@ -80,7 +83,8 @@ function CoreBarView.new(screenGui: Instance)
 
 	local trackFill = Instance.new("Frame")
 	trackFill.Name = "TrackFill"
-	trackFill.Size = UDim2.new(0, 0, 0, TRACK_HEIGHT)
+	trackFill.Size = UDim2.new(0, 0, 1, 0)
+	trackFill.AnchorPoint = Vector2.new(0, 0)
 	trackFill.Position = UDim2.new(0, 0, 0, 0)
 	trackFill.BackgroundColor3 = Color3.new(1, 0.85, 0.1)
 	trackFill.BorderSizePixel = 0
@@ -106,15 +110,14 @@ function CoreBarView.new(screenGui: Instance)
 	self._dots = {}
 	self._waitingMode = false
 
-	local dotSpacing = TRACK_WIDTH / (TOTAL_DOTS - 1)
-
 	for i = 1, TOTAL_DOTS do
-		local dotCenterX = TRACK_PAD + dotSpacing * (i - 1)
+		local centerX = TRACK_LEFT_SCALE + DOT_GAP_SCALE * (i - 1)
 
 		local dotFrame = Instance.new("Frame")
 		dotFrame.Name = "Dot_" .. tostring(i)
-		dotFrame.Size = UDim2.new(0, DOT_SIZE, 0, DOT_SIZE)
-		dotFrame.Position = UDim2.new(0, dotCenterX - DOT_SIZE / 2, 0, DOT_Y)
+		dotFrame.AnchorPoint = Vector2.new(0.5, 0.5)
+		dotFrame.Size = UDim2.new(DOT_SIZE_SCALE, 0, 0.42, 0)
+		dotFrame.Position = UDim2.new(centerX, 0, DOT_Y_SCALE, 0)
 		dotFrame.BackgroundColor3 = Color3.new(0.15, 0.15, 0.22)
 		dotFrame.BackgroundTransparency = 0.5
 		dotFrame.BorderSizePixel = 0
@@ -168,8 +171,9 @@ function CoreBarView.new(screenGui: Instance)
 
 		local nameLabel = Instance.new("TextLabel")
 		nameLabel.Name = "Name"
-		nameLabel.Size = UDim2.new(0, DOT_SIZE + 16, 0, 12)
-		nameLabel.Position = UDim2.new(0.5, -(DOT_SIZE + 16) / 2, 0, -14)
+		nameLabel.AnchorPoint = Vector2.new(0.5, 1)
+		nameLabel.Size = UDim2.new(0.075, 0, 0.11, 0)
+		nameLabel.Position = UDim2.new(centerX, 0, 0.05, 0)
 		nameLabel.BackgroundTransparency = 1
 		nameLabel.TextColor3 = Color3.new(0.5, 0.5, 0.6)
 		nameLabel.TextSize = 10
@@ -229,7 +233,7 @@ function CoreBarView:SetWaitingMode(neededTrophies: number, nextBatchOffset: num
 	self._timeLabel.TextSize = 14
 	self._timeLabel.TextXAlignment = Enum.TextXAlignment.Center
 
-	self._trackFill.Size = UDim2.new(0, TRACK_WIDTH, 0, TRACK_HEIGHT)
+	self._trackFill.Size = UDim2.new(1, 0, 1, 0)
 
 	for i = 1, TOTAL_DOTS do
 		local entry = self._dots[i]
@@ -278,7 +282,7 @@ function CoreBarView:UpdateTime(totalSeconds: number)
 	local filledDots = math.min(math.floor(totalSeconds / NPC_UNLOCK_INTERVAL), TOTAL_DOTS)
 
 	local fillRatio = math.min(totalSeconds / TOTAL_DURATION, 1)
-	self._trackFill.Size = UDim2.new(0, TRACK_WIDTH * fillRatio, 0, TRACK_HEIGHT)
+	self._trackFill.Size = UDim2.new(fillRatio, 0, 1, 0)
 
 	for i = 1, TOTAL_DOTS do
 		local entry = self._dots[i]

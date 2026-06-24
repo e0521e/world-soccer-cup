@@ -3,14 +3,14 @@ local TweenService = game:GetService("TweenService")
 local ActionPanelView = {}
 ActionPanelView.__index = ActionPanelView
 
-local function makeButton(name: string, text: string, color: Color3, gradient: {ColorSequenceKeypoint})
+local function makeButton(name: string, text: string, color: Color3)
 	local btn = Instance.new("TextButton")
 	btn.Name = name .. "Button"
-	btn.Size = UDim2.new(0, 130, 0, 50)
+	btn.Size = UDim2.new(1, 0, 0.3, 0)
 	btn.BackgroundColor3 = color
 	btn.BackgroundTransparency = 0.3
 	btn.TextColor3 = Color3.new(1, 1, 1)
-	btn.TextSize = 18
+	btn.TextScaled = true
 	btn.Font = Enum.Font.GothamBold
 	btn.TextStrokeTransparency = 0
 	btn.TextStrokeColor3 = Color3.new(0, 0, 0)
@@ -30,8 +30,9 @@ function ActionPanelView.new(screenGui: Instance)
 
 	local panel = Instance.new("Frame")
 	panel.Name = "ActionPanel"
-	panel.Size = UDim2.new(0, 130, 0, 240)
-	panel.Position = UDim2.new(1, -150, 0.5, -120)
+	panel.AnchorPoint = Vector2.new(1, 0.5)
+	panel.Size = UDim2.new(0.07, 0, 0.18, 0)
+	panel.Position = UDim2.new(0.97, 0, 0.5, 0)
 	panel.BackgroundTransparency = 1
 	panel.BorderSizePixel = 0
 	panel.ZIndex = 5
@@ -39,35 +40,23 @@ function ActionPanelView.new(screenGui: Instance)
 
 	local layout = Instance.new("UIListLayout")
 	layout.SortOrder = Enum.SortOrder.LayoutOrder
-	layout.Padding = UDim.new(0, 12)
+	layout.Padding = UDim.new(0.08, 0)
 	layout.HorizontalAlignment = Enum.HorizontalAlignment.Center
 	layout.Parent = panel
 
-	local shop = makeButton("Shop", "🏪 Shop", Color3.new(0.1, 0.4, 0.25), {
-		ColorSequenceKeypoint.new(0, Color3.new(0.15, 0.55, 0.3)),
-		ColorSequenceKeypoint.new(1, Color3.new(0.08, 0.3, 0.18)),
-	})
+	local shop = makeButton("Shop", "🏪", Color3.new(0.1, 0.4, 0.25))
 	shop.LayoutOrder = 1
 	shop.Parent = panel
 
-	local pitch = makeButton("Pitch", "🏟️ Pitch", Color3.new(0.15, 0.25, 0.5), {
-		ColorSequenceKeypoint.new(0, Color3.new(0.2, 0.35, 0.65)),
-		ColorSequenceKeypoint.new(1, Color3.new(0.1, 0.2, 0.4)),
-	})
+	local pitch = makeButton("Pitch", "🏟", Color3.new(0.15, 0.25, 0.5))
 	pitch.LayoutOrder = 2
 	pitch.Parent = panel
 
-	local rebirth = makeButton("Rebirth", "🔄 Rebirth", Color3.new(0.4, 0.1, 0.1), {
-		ColorSequenceKeypoint.new(0, Color3.new(0.55, 0.15, 0.15)),
-		ColorSequenceKeypoint.new(1, Color3.new(0.3, 0.08, 0.08)),
-	})
+	local rebirth = makeButton("Rebirth", "🔄", Color3.new(0.4, 0.1, 0.1))
 	rebirth.LayoutOrder = 3
 	rebirth.Parent = panel
 
-	local gm = makeButton("GM", "⚙️ GM", Color3.new(0.5, 0.15, 0.05), {
-		ColorSequenceKeypoint.new(0, Color3.new(0.65, 0.2, 0.08)),
-		ColorSequenceKeypoint.new(1, Color3.new(0.4, 0.1, 0.03)),
-	})
+	local gm = makeButton("GM", "⚙", Color3.new(0.5, 0.15, 0.05))
 	gm.LayoutOrder = 4
 	gm.Parent = panel
 	gm.Visible = false
@@ -76,13 +65,13 @@ function ActionPanelView.new(screenGui: Instance)
 		btn.MouseEnter:Connect(function()
 			TweenService:Create(btn, TweenInfo.new(0.2, Enum.EasingStyle.Quad, Enum.EasingDirection.Out), {
 				BackgroundTransparency = 0.1,
-				Size = UDim2.new(0, 136, 0, 54),
+				Size = UDim2.new(1, 0, 0.34, 0),
 			}):Play()
 		end)
 		btn.MouseLeave:Connect(function()
 			TweenService:Create(btn, TweenInfo.new(0.2, Enum.EasingStyle.Quad, Enum.EasingDirection.Out), {
 				BackgroundTransparency = 0.3,
-				Size = UDim2.new(0, 130, 0, 50),
+				Size = UDim2.new(1, 0, 0.3, 0),
 			}):Play()
 		end)
 	end

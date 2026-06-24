@@ -95,12 +95,18 @@ local BallSpawnService = Knit.CreateService({
 
         local areaBall = field:FindFirstChild("AreaBall")
         if areaBall and areaBall:IsA("BasePart") then
-            local cp = areaBall.Position
-            local cs = areaBall.Size
+            local cf = areaBall.CFrame
+            local sz = areaBall.Size
+            local localPos = Vector3.new(
+                (math.random() - 0.5) * sz.X,
+                (math.random() - 0.5) * sz.Y,
+                (math.random() - 0.5) * sz.Z
+            )
+            local worldPos = cf:PointToWorldSpace(localPos)
             dropPos = Vector3.new(
-                cp.X + (math.random() - 0.5) * cs.X,
+                worldPos.X,
                 Constants.BALL_SPAWN_DROP_HEIGHT,
-                cp.Z + (math.random() - 0.5) * cs.Z
+                worldPos.Z
             )
         end
 

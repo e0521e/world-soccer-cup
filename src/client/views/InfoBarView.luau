@@ -1,7 +1,7 @@
-local function createSegment(parent: Instance, xPos: number, icon: string, color: Color3, strokeColor: Color3)
+local function createSegment(parent: Instance, xScale: number, icon: string, color: Color3, strokeColor: Color3)
 	local frame = Instance.new("Frame")
-	frame.Size = UDim2.new(0, 110, 1, 0)
-	frame.Position = UDim2.new(0, xPos, 0, 0)
+	frame.Size = UDim2.new(0.32, 0, 1, 0)
+	frame.Position = UDim2.new(xScale, 0, 0, 0)
 	frame.BackgroundColor3 = Color3.new(0.04, 0.04, 0.1)
 	frame.BackgroundTransparency = 0.2
 	frame.BorderSizePixel = 0
@@ -27,8 +27,8 @@ local function createSegment(parent: Instance, xPos: number, icon: string, color
 	stroke.Parent = frame
 
 	local iconLabel = Instance.new("TextLabel")
-	iconLabel.Size = UDim2.new(0, 24, 1, 0)
-	iconLabel.Position = UDim2.new(0, 4, 0, 0)
+	iconLabel.Size = UDim2.new(0.25, 0, 1, 0)
+	iconLabel.Position = UDim2.new(0, 0, 0, 0)
 	iconLabel.BackgroundTransparency = 1
 	iconLabel.Text = icon
 	iconLabel.TextScaled = true
@@ -37,8 +37,8 @@ local function createSegment(parent: Instance, xPos: number, icon: string, color
 	iconLabel.Parent = frame
 
 	local valueLabel = Instance.new("TextLabel")
-	valueLabel.Size = UDim2.new(1, -32, 1, 0)
-	valueLabel.Position = UDim2.new(0, 28, 0, 0)
+	valueLabel.Size = UDim2.new(0.72, 0, 1, 0)
+	valueLabel.Position = UDim2.new(0.25, 0, 0, 0)
 	valueLabel.BackgroundTransparency = 1
 	valueLabel.TextColor3 = color
 	valueLabel.TextStrokeTransparency = 0.1
@@ -61,15 +61,16 @@ function InfoBarView.new(screenGui: Instance)
 
 	local bar = Instance.new("Frame")
 	bar.Name = "InfoBar"
-	bar.Size = UDim2.new(0, 342, 0, 34)
-	bar.Position = UDim2.new(0.5, -171, 0, 16)
+	bar.AnchorPoint = Vector2.new(0.5, 0)
+	bar.Size = UDim2.new(0.18, 0, 0.032, 0)
+	bar.Position = UDim2.new(0.5, 0, 0, 0.015)
 	bar.BackgroundTransparency = 1
 	bar.BorderSizePixel = 0
 	bar.Parent = screenGui
 
 	self._coinLabel = createSegment(bar, 0, "💵", Color3.new(1, 0.9, 0.1), Color3.new(0.5, 0.3, 0))
-	self._powerLabel = createSegment(bar, 116, "⚔", Color3.new(1, 0.5, 0.1), Color3.new(0.3, 0.1, 0))
-	self._trophyLabel = createSegment(bar, 232, "🏆", Color3.new(0.7, 0.85, 1), Color3.new(0, 0, 0.2))
+	self._powerLabel = createSegment(bar, 0.34, "⚔", Color3.new(1, 0.5, 0.1), Color3.new(0.3, 0.1, 0))
+	self._trophyLabel = createSegment(bar, 0.68, "🏆", Color3.new(0.7, 0.85, 1), Color3.new(0, 0, 0.2))
 
 	return self
 end

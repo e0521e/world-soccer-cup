@@ -3,7 +3,6 @@ local TweenService = game:GetService("TweenService")
 local DEFAULT_DURATION = 2
 local ANIM_IN = 0.3
 local ANIM_OUT = 0.4
-local TOAST_WIDTH = 340
 
 local ToastView = {}
 ToastView.__index = ToastView
@@ -13,83 +12,70 @@ function ToastView.new(screenGui: Instance)
 
 	self._container = Instance.new("Frame")
 	self._container.Name = "ToastContainer"
-	self._container.Size = UDim2.new(0, 0, 0, 0)
+	self._container.Size = UDim2.new(0.2, 0, 0, 0)
 	self._container.Position = UDim2.new(0.5, 0, 0.38, 0)
 	self._container.AnchorPoint = Vector2.new(0.5, 0.5)
 	self._container.BackgroundTransparency = 1
 	self._container.Parent = screenGui
 
 	self._queue = {}
-	self._active = false
+	self._isDisplaying = false
 
 	return self
 end
 
 function ToastView:Show(options)
-	table.insert(self._queue, options)
-	if not self._active then
-		self:_ProcessQueue()
-	end
+	local opts = {
+		emoji = options.emoji or "",
+		title = options.title or "",
+		body = options.body or "",
+		duration = options.duration or DEFAULT_DURATION,
+	}
+	table.insert(self._queue, opts)
+	self:_ProcessQueue()
 end
 
 function ToastView:_ProcessQueue()
-	if #self._queue == 0 then
-		self._active = false
-		return
-	end
-	self._active = true
+	if self._isDisplaying or #self._queue == 0 then return end
+	self._isDisplaying = true
 	local opts = table.remove(self._queue, 1)
 	self:_Display(opts)
 end
 
 function ToastView:_BuildContent(bg, opts)
 	local padding = Instance.new("UIPadding")
-	padding.PaddingTop = UDim.new(0, 14)
-	padding.PaddingBottom = UDim.new(0, 14)
-	padding.PaddingLeft = UDim.new(0, 18)
-	padding.PaddingRight = UDim.new(0, 18)
+	padding.PaddingTop = UDim.new(0, 12)
+	padding.PaddingBottom = UDim.new(0, 12)
+	padding.PaddingLeft = UDim.new(0, 14)
+	padding.PaddingRight = UDim.new(0, 14)
 	padding.Parent = bg
 
 	local list = Instance.new("UIListLayout")
-	list.SortOrder = Enum.SortOrder.LayoutOrder
 	list.VerticalAlignment = Enum.VerticalAlignment.Center
-	list.Padding = UDim.new(0, 6)
+	list.Padding = UDim.new(0, 4)
 	list.Parent = bg
 
-	if opts.emoji or opts.title then
+	if opts.emoji and opts.emoji ~= "" then
 		local row = Instance.new("Frame")
-		row.Name = "HeaderRow"
-		row.Size = UDim2.new(1, 0, 0, 0)
-		row.AutomaticSize = Enum.AutomaticSize.Y
+		row.Size = UDim2.new(1, 0, 0, 32)
 		row.BackgroundTransparency = 1
-		row.BorderSizePixel = 0
 		row.LayoutOrder = 1
 		row.Parent = bg
 
-		local rowList = Instance.new("UIListLayout")
-		rowList.FillDirection = Enum.FillDirection.Horizontal
-		rowList.VerticalAlignment = Enum.VerticalAlignment.Center
-		rowList.Padding = UDim.new(0, 10)
-		rowList.SortOrder = Enum.SortOrder.LayoutOrder
-		rowList.Parent = row
-
-		if opts.emoji and opts.emoji ~= "" then
-			local emoji = Instance.new("TextLabel")
-			emoji.Name = "Emoji"
-			emoji.Size = UDim2.new(0, 32, 0, 32)
-			emoji.BackgroundTransparency = 1
-			emoji.TextColor3 = Color3.new(1, 1, 1)
-			emoji.TextScaled = true
-			emoji.Font = Enum.Font.GothamBold
-			emoji.Text = opts.emoji
-			emoji.LayoutOrder = 1
-			emoji.Parent = row
-		end
+		local emoji = Instance.new("TextLabel")
+		emoji.Size = UDim2.new(0, 28, 1, 0)
+		emoji.BackgroundTransparency = 1
+		emoji.Text = opts.emoji
+		emoji.TextScaled = true
+		emoji.Font = Enum.Font.GothamBold
+		emoji.TextXAlignment = Enum.TextXAlignment.Left
+		emoji.LayoutOrder = 1
+		emoji.Parent = row
 
 		if opts.title and opts.title ~= "" then
 			local title = Instance.new("TextLabel")
 			title.Name = "Title"
-			title.Size = UDim2.new(0, TOAST_WIDTH - 100, 0, 32)
+			title.Size = UDim2.new(1, -36, 1, 0)
 			title.BackgroundTransparency = 1
 			title.TextColor3 = Color3.new(1, 1, 1)
 			title.TextStrokeTransparency = 0.15
@@ -106,7 +92,7 @@ function ToastView:_BuildContent(bg, opts)
 	if opts.body and opts.body ~= "" then
 		local body = Instance.new("TextLabel")
 		body.Name = "Body"
-		body.Size = UDim2.new(0, TOAST_WIDTH - 36, 0, 0)
+		body.Size = UDim2.new(1, -28, 0, 0)
 		body.AutomaticSize = Enum.AutomaticSize.Y
 		body.BackgroundTransparency = 1
 		body.TextColor3 = Color3.new(0.9, 0.9, 1)
@@ -127,7 +113,7 @@ function ToastView:_Display(opts)
 
 	local borderGlow = Instance.new("Frame")
 	borderGlow.Name = "ToastGlow"
-	borderGlow.Size = UDim2.new(0, TOAST_WIDTH + 4, 0, 0)
+	borderGlow.Size = UDim2.new(0.94, 0, 0, 0)
 	borderGlow.AutomaticSize = Enum.AutomaticSize.Y
 	borderGlow.BackgroundColor3 = Color3.new(0.4, 0.6, 1)
 	borderGlow.BackgroundTransparency = 1
@@ -143,75 +129,64 @@ function ToastView:_Display(opts)
 
 	local bg = Instance.new("Frame")
 	bg.Name = "Toast"
-	bg.Size = UDim2.new(0, TOAST_WIDTH, 0, 0)
+	bg.Size = UDim2.new(0.9, 0, 0, 0)
 	bg.AutomaticSize = Enum.AutomaticSize.Y
 	bg.BackgroundColor3 = Color3.new(0.05, 0.05, 0.12)
-	bg.BackgroundTransparency = 0.1
+	bg.BackgroundTransparency = 0.15
 	bg.BorderSizePixel = 0
 	bg.AnchorPoint = Vector2.new(0.5, 0.5)
 	bg.Position = UDim2.new(0.5, 0, 0.5, 0)
 	bg.ZIndex = 50
 	bg.Parent = self._container
 
-	local bgGradient = Instance.new("UIGradient")
-	bgGradient.Color = ColorSequence.new({
-		ColorSequenceKeypoint.new(0, Color3.new(0.08, 0.08, 0.18)),
-		ColorSequenceKeypoint.new(1, Color3.new(0.04, 0.04, 0.1)),
-	})
-	bgGradient.Rotation = 90
-	bgGradient.Parent = bg
-
 	local bgCorner = Instance.new("UICorner")
 	bgCorner.CornerRadius = UDim.new(0, 10)
 	bgCorner.Parent = bg
 
 	local bgStroke = Instance.new("UIStroke")
-	bgStroke.Color = Color3.new(0.4, 0.5, 0.8)
+	bgStroke.Color = Color3.new(0.4, 0.6, 1)
 	bgStroke.Thickness = 1
-	bgStroke.Transparency = 0.45
+	bgStroke.Transparency = 0.6
 	bgStroke.Parent = bg
 
 	self:_BuildContent(bg, opts)
 
-	bg.Size = UDim2.new(0, TOAST_WIDTH, 0, 0)
-	borderGlow.Size = UDim2.new(0, TOAST_WIDTH + 4, 0, 0)
-
-	task.wait()
-
 	local targetHeight = bg.AbsoluteSize.Y
-	if targetHeight < 1 then targetHeight = 60 end
-
-	local scaleIn = TweenService:Create(bg, TweenInfo.new(ANIM_IN, Enum.EasingStyle.Back, Enum.EasingDirection.Out), {
-		Size = UDim2.new(0, TOAST_WIDTH, 0, targetHeight),
-	})
-	local glowIn = TweenService:Create(borderGlow, TweenInfo.new(ANIM_IN, Enum.EasingStyle.Back, Enum.EasingDirection.Out), {
-		BackgroundTransparency = 0.6,
-		Size = UDim2.new(0, TOAST_WIDTH + 4, 0, targetHeight + 4),
-	})
-	scaleIn:Play()
-	glowIn:Play()
-	scaleIn.Completed:Wait()
-
-	task.wait(duration)
-
-	local fadeOut = TweenService:Create(bg, TweenInfo.new(ANIM_OUT, Enum.EasingStyle.Quad, Enum.EasingDirection.Out), {
-		BackgroundTransparency = 1,
-	})
-	local glowOut = TweenService:Create(borderGlow, TweenInfo.new(ANIM_OUT, Enum.EasingStyle.Quad, Enum.EasingDirection.Out), {
-		BackgroundTransparency = 1,
-	})
-	fadeOut:Play()
-	glowOut:Play()
-	fadeOut.Completed:Wait()
-
-	bg:Destroy()
-	borderGlow:Destroy()
-
-	if opts.onComplete then
-		task.spawn(opts.onComplete)
+	if targetHeight < 1 then
+		task.wait()
+		targetHeight = bg.AbsoluteSize.Y
+		if targetHeight < 1 then targetHeight = 60 end
 	end
 
-	self:_ProcessQueue()
+	local bgTarget = UDim2.new(0.9, 0, 0, targetHeight)
+	local glowTarget = UDim2.new(0.94, 0, 0, targetHeight + 6)
+
+	local inTweenBg = TweenService:Create(bg, TweenInfo.new(ANIM_IN, Enum.EasingStyle.Quad, Enum.EasingDirection.Out), {
+		Size = bgTarget,
+	})
+	local inTweenGlow = TweenService:Create(borderGlow, TweenInfo.new(ANIM_IN, Enum.EasingStyle.Quad, Enum.EasingDirection.Out), {
+		Size = glowTarget,
+		BackgroundTransparency = 0.6,
+	})
+	inTweenBg:Play()
+	inTweenGlow:Play()
+
+	task.delay(duration, function()
+		local outTweenBg = TweenService:Create(bg, TweenInfo.new(ANIM_OUT, Enum.EasingStyle.Quad, Enum.EasingDirection.In), {
+			BackgroundTransparency = 1,
+		})
+		local outTweenGlow = TweenService:Create(borderGlow, TweenInfo.new(ANIM_OUT, Enum.EasingStyle.Quad, Enum.EasingDirection.In), {
+			BackgroundTransparency = 1,
+		})
+		outTweenBg:Play()
+		outTweenGlow:Play()
+		outTweenBg.Completed:Connect(function()
+			bg:Destroy()
+			borderGlow:Destroy()
+			self._isDisplaying = false
+			self:_ProcessQueue()
+		end)
+	end)
 end
 
 return ToastView
