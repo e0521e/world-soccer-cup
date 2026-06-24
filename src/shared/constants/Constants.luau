@@ -17,10 +17,14 @@ local Constants = {
     AUTO_KICK_DISTANCE = 6,         -- 自动踢球触发距离（studs）
     NPC_WALK_SPEED = 16,            -- NPC 走向球时的移动速度（studs/s）
     MAX_BALLS_ON_FIELD = 3,         -- 场上同时存在的球数量上限
+    MAX_BALLS_PER_PLAYER = 11,      -- 每个玩家同时拥有的球数量上限（一队最多11人）
     NPC_RUN_ANIM_ID = "rbxassetid://913376220",    -- NPC 奔跑动画 ID
     ONLINE_TOTAL_MINUTES = 5,       -- 在线进度总时长（分钟）- 测试阶段减半
     NPC_UNLOCK_COUNTDOWN = 30,      -- NPC 槽位初始倒计时（秒）
+    MAX_ACTIVE_NPCS = 10,           -- 场上同时踢球 NPC 上限
     WORLD_CUP_REQUIRED_NPCS = 10,   -- 参加世界杯所需最少 NPC 数量
+    HEAD_CAM_FOV = 50,              -- NPC 头像相机视野角度（度）
+    USER_ICON_TEMPLATE = "rbxthumb://type=AvatarHeadShot&id=%s&w=60&h=60",  -- 玩家头像 URL 模板
 }
 
 return Constants

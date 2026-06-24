@@ -5,7 +5,7 @@
 ### 1.1 基本信息
 
 | 项目 | 内容 |
-| -------- | ------------------ |
+| ------ | ------------------ |
 | 游戏名称 | 自由踢球 |
 | 游戏类型 | 半挂机自由踢自动进球（Semi-idle Free Kick Auto-scoring） |
 | 目标平台 | Roblox（PC / 移动端 / 主机） |
@@ -14,35 +14,36 @@
 
 ### 1.2 核心体验
 
-玩家分配到专属半球场，场上按3个站位槽位轮转出现球星NPC。玩家通过在线累积时间逐步解锁84位球星：每当在线进度条达到一个节点，即解锁一个NPC并填充到战术板。全部10人解锁后进入"满员等待"阶段——3个站位槽切换为下一批NPC（无倒计时，头顶提示"赢得世界杯后，我会加入你"），场上仍然正常掉球和踢球。玩家走向场地中央的世界杯奖杯触发比赛，获胜后进度重置、解锁下一批10个NPC，循环直至所有84位球星解锁。
+玩家分配到专属半球场。场上设有 **3 个固定站位**（Slot1-3），新解锁的 NPC 依次从这 3 个站位出场。解锁后的 NPC 自动寻球、踢球、进球，加入场上活跃池（`ActiveNPCS`，上限 10 个）。超过 10 个时采用 FIFO 替换（最早进入的 NPC 离场）。
+
+每 30 秒解锁 1 个 NPC，一轮 10 个（5 分钟总和）。10 人解锁完成后触发「满员等待」阶段——玩家必须走向世界杯奖杯触发比赛。**世界杯总是获胜** → 奖杯 +1 → 进入下一轮解锁。循环至全部 84 位球星解锁。
+
+老玩家重连时，`ActiveNPCS` 中记录的上次在场 NPC 会被随机放置在球场活动区（AreaBall），恢复踢球循环。
 
 ### 1.3 核心循环
 
 ```txt
 阶段 1：解锁阶段
-  → 在线进度条累积（ONLINE_TOTAL_MINUTES）
-  → 每到一个节点（总时间/10），解锁1个球星
-  → 从 NPCList 按顺序取（id=1→10, 11→20, ...）
-  → NPC 头像填充到战术板 card_2~card_11
-  → card_1 始终为本地玩家头像
-  → 场上3个站位槽显示已解锁的 NPC，带倒计时
+  → 在线进度条累积
+  → 每 NPC_UNLOCK_COUNTDOWN（30s）解锁 1 个球星
+  → 从 NPCList 按 order 顺序，取未解锁的前 10 个
+  → NPC 从 3 个站位依次上场 → 自动寻球踢球 → 加入 ActiveNPCS
+  → ActiveNPCS 超 10 个时 FIFO 移除最早 NPC
 
 阶段 2：满员等待
-  → 10人解锁完毕 → 进度条停
-  → 3个站位槽切换为下一批 NPC（11/12/13, 21/22/23...）
-  → 不显示倒计时，NPC 头顶提示 "Win World Cup to join me!"
-  → 场上仍然正常掉球/踢球（NPC参与自动踢球）
+  → 10 人解锁完毕 → 进度条停
+  → 场上 NPC 继续自动踢球
+  → 等待玩家走向世界杯奖杯
 
 阶段 3：世界杯比赛
-  → 玩家走向场地中央的世界杯奖杯（ProximityPrompt，按E触发）
-  → 检查 #UnlockedNPCs >= 10（10 NPC + 玩家 = 11 人队伍）
+  → 玩家走向场地中央奖杯（ProximityPrompt，按 E 触发）
+  → 检查 #UnlockedNPCs >= 10
   → 不足则提示 "Need 10 players"
-  → 奖杯升起至玩家头顶（1.5s tween），模拟等待（11-20s 随机），奖杯归位
+  → 奖杯升起（1.5s tween）→ 等待 11~20s → 奖杯归位（1.5s）
   → 总是赢 → Trophies+1
 
 阶段 4：下一轮
-  → 进度条重置，继续解锁下一批 10 个球星（id=11→20, 21→30, ...）
-  → 后续每轮解锁的 NPC 也填充到战术板（已有卡片不替换）
+  → 进度条重置，继续解锁下一批 10 个
   → 循环至全部 84 人解锁
 ```
 
@@ -52,23 +53,21 @@
 
 ### 2.1 多场布局
 
-服务器启动时从 `Workspace.Field_1` 模板克隆 **6 个球场**，分两列（Row A X=-10 正常、Row B X=10 绕 Y 旋转 180°），Z 轴排开（-112/0/112）。
-球门相对、行走区居中，玩家被分配一个专属场。
+服务器启动时从 `Workspace.Field_1` 模板克隆 **6 个球场**，六边形排布（半径 ~110 studs，每 60° 一个场）。球门朝外、球员中场站位，每个玩家分配一个专属场。
 
-### 2.2 单场尺寸
+### 2.2 单场结构
 
-| 参数 | 值 |
-| -------- | ------------------- |
-| 场地中心 | (0, 0, 0) 相对模板 |
-| X 轴跨度 | ~116 studs |
-| Z 轴跨度 | ~140 studs |
-| 球门位置 | X≈116, Z≈0（正常朝向） |
-| 禁区 | X≈70-105 |
-| 格位 | 3 个占位块（Part），策划可拖拽调整位置 |
+| 参数 | 说明 |
+| --- | --- |
+| 球门 | 1 个（`_door`），内含 goal_chk 检测器 |
+| 站位点 | `Player/Slot1`、`Slot2`、`Slot3` 三个 Marker Part |
+| 活动区 | `AreaBall` BasePart，球掉落范围 |
+| 升级区 | `Zone_LevelUp` + touch 检测 |
+| 战术板 | `Info/Main/Gui` — SurfaceGui 显示已解锁 NPC icon |
 
 ### 2.3 场主标牌
 
-每个球场中心上方 30 studs 有一个 `FieldOwnerGui` BillboardGui（头像+名字），默认隐藏，分配玩家后显示。
+每个球场中心上方 30 studs 有一个 `FieldOwnerGui` BillboardGui（头像 + 名字），分配玩家后显示。
 
 ---
 
@@ -80,99 +79,83 @@
 Idle → 解锁阶段
   │
   ▼
-3 NPC 倒计时运行（头顶 BillboardGui 显示剩余秒数）
-  │
-  ▼（任一 NPC 倒计时 = 0）
-Player 自动移至目标 NPC 位置（"吃球员" / Take Over）
+在线计时累积，每 30s 解锁 1 个 NPC
   │
   ▼
-NPC 自动寻路至禁区内最近的一颗球
+NPC 从 SlotX 站位从天而降 → 加入场上活跃池
   │
   ▼
-NPC 播放踢球动画（Humanoid 动画）
+NPC 自动寻球 → 走向球 → 踢球动画 → 球弧线飞向球门
   │
   ▼
-球沿弧线/抛物线飞入球门（Tween / Lerp）
+goal_chk 距离检测 → 判定进球 → Coins 增加
   │
   ▼
-goal_chk.Touched 检测 → 判定进球
-  │
-  ▼
-Coins 增加 → 下一 NPC 倒计时开始
+NPC CD（品质 cool down）后继续寻球踢球（独立循环）
   │
   ▼ (10 NPC 全部解锁)
 满员等待阶段
   │
-  ▼ (按E触发ProximityPrompt)
-世界杯比赛阶段：奖杯升起 → 等待11-20s → 奖杯归位 → Trophies+1
+  ▼ (按 E 触发 ProximityPrompt)
+世界杯比赛阶段：奖杯升起 → 等待 11~20s → 奖杯归位 → Trophies+1
   │
   ▼
-下一轮：进度重置 → 返回解锁阶段（下一批10个NPC）
+下一轮：进度重置 → 返回解锁阶段（下一批 10 个 NPC）
 ```
 
-### 3.2 NPC 倒计时系统
+### 3.2 NPC 解锁系统
 
 | 参数 | 值 |
-| -------- | ------------------- |
-| 同时活跃 NPC 数 | 3 |
-| 倒计时范围 | 可配置（例：15~30 秒随机） |
-| 显示方式 | 头顶 BillboardGui |
-| 倒计时归零触发 | 玩家自动移至该 NPC |
-| 满员后模式 | 3个站位切换到下一批NPC，无倒计时，提示"Win World Cup to join me!" |
+| --- | --- |
+| 站位数量 | 3（Slot1-3，Marker Part，**不删除**） |
+| 每轮解锁数 | 10（`ACTIVE_NPC_COUNT`） |
+| 解锁间隔 | 30s（`NPC_UNLOCK_COUNTDOWN`） |
+| 总轮时间 | 300s（`ONLINE_TOTAL_MINUTES` × 60） |
+| 出场方式 | 从站位依次上场，从天而降（drop 动画 1.5s） |
+| FIFO 上限 | 10（`MAX_ACTIVE_NPCS`），超限时移除最早 |
 
-### 3.3 自动吃球员（Auto Take-over）
+### 3.3 NPC 自动踢球
 
-当 NPC 倒计时归零时：
+NPC 上场后进入独立踢球循环：
 
 | 步骤 | 描述 |
 | --- | --- |
-| 1 | 服务器将玩家角色移至 NPC 所在位置 |
-| 2 | NPC 设为活跃状态 |
-| 3 | NPC 开始自动寻路到禁区内最近的球 |
+| 1 | 扫描场上已落地的球 |
+| 2 | 计算距离最近的球 |
+| 3 | NPC Humanoid 自动行走至球位置（MoveTo） |
+| 4 | 播放踢球动画 |
+| 5 | 球沿弧线飞向球门 goal_chk |
+| 6 | 距离检测 `< 40` → 判进球 → 发放 Coins |
+| 7 | 进入品质 CD（2~10s），然后回到步骤 1 |
 
-### 3.4 自动寻球
-
-NPC 激活后：
-
-| 步骤 | 描述 |
-| --- | --- |
-| 1 | 扫描 `ServerStorage.Ball` 中所有球，或在禁区内查找已放置的球 |
-| 2 | 计算距离最近的球（使用 `(pos - ballPos).Magnitude`） |
-| 3 | NPC 通过 PathfindingService 或简单步行移动到球所在位置 |
-| 4 | 到达球附近后触发踢球动画 |
-
-### 3.5 自动踢球
-
-NPC 到达球位置后：
+### 3.4 自动踢球参数
 
 | 参数 | 值 |
-| -------- | ------------------- |
-| 触发方式 | 自动（无需玩家按键） |
-| 动画 | NPC Humanoid 播放预设踢球动画 |
-| 球飞行 | 从当前位置沿弧线飞入球门（~1~2 秒） |
-| 运动类型 | 弧线/抛物线（TweenService 或自定义 Lerp） |
+| --- | --- |
+| NPC 行走速度 | `NPC_WALK_SPEED`（20） |
+| 球飞行时间 | `BALL_FLIGHT_DURATION`（1.5s） |
+| 弧线高度 | `BALL_ARC_MIN`~`BALL_ARC_MAX`（3~10） |
+| 进球判定距离 | `< 40 studs` |
+| 冷却 CD | 品质 cooldown（Common=10, Rare=8, Epic=6, Legendary=4, Mythic=2） |
 
-### 3.6 进球检测
+### 3.5 进球检测
 
-唯一球门 `Workspace.Field_1._door` 内含 `goal_chk` 部件：
+球飞行终点 → 计算 Main 位置与 goal_chk.Position 距离 → `< 40` 即判进球：
 
-| 属性 | 值 |
-| -------- | ------------------- |
-| ClassName | Part |
-| 大小 | 2 × 9 × 24 studs |
-| Anchored | true |
-| CanTouch | true |
-| Transparent | true（不可见检测器） |
+```txt
+球飞行结束 (elapsed >= 1.5s)
+  → 计算 Main.Position 与 goal_chk.Position 距离
+  → dist < 40 → 进球 → 发放金币 → 播放音效 "coins" → 2s 后销毁球
+```
 
-当球的 `Main` MeshPart 与 `goal_chk` 发生 Touch 事件时，判定为进球。
+### 3.6 进球奖励
 
-### 3.7 奖励发放
-
-| 结果 | 操作 |
-| -------- | ------------------ |
-| 进球 | +Coins、播放进球特效、更新 UI |
-| 未进球 | 球飞出边界后消失，等待下一轮 NPC 循环 |
-| 结算 | Coins 累加到玩家数据并写入 DataStore |
+| 参数 | 值 |
+| --- | --- |
+| 基础金币 | `BASE_COINS`（20） |
+| 等级倍率 | 见 8.1 玩家等级表 |
+| NPC 品质倍率 | 见 6.4 品质表 |
+| 公式 | `单次进球 = BASE_COINS × 等级倍率 × NPC 品质倍率` |
 
 ---
 
@@ -183,153 +166,67 @@ NPC 到达球位置后：
 每个球模型（`ServerStorage.Ball.ballN`）包含：
 
 | 部件 | 类型 | 说明 |
-| -------- | ------------------------ | --------------------------------- |
-| E_Ball | Part + ProximityPrompt | 触发器部件（保留但非核心交互入口） |
+| --- | --- | --- |
+| E_Ball | Part + ProximityPrompt | 触发器部件 |
 | Highlight | Highlight | 球体高亮 |
 | Main | MeshPart | 球体主体，size 2×2×2 |
 | Main.Shoot | Sound | 射门音效 |
 | Main.Trail | Trail | 飞行轨迹尾迹 |
 
-### 4.2 球清单
+### 4.2 球生成逻辑
 
-`ServerStorage.Ball` 下有 45 个球模型（ball1~ball44 + ball422），根据玩家拥有的球 ID 列表（`BallIds`）随机选一个克隆。
+| 参数 | 值 |
+| --- | --- |
+| 生成间隔 | `BALL_SPAWN_INTERVAL`（6s） |
+| 每玩家球上限 | `MAX_BALLS_PER_PLAYER`（11） |
+| 模板来源 | `ServerStorage.Ball`，从玩家 `BallIds` 随机选 |
+| 下落起点 | Y = 50（`BALL_SPAWN_DROP_HEIGHT`） |
+| 落地目标 | Y = 1.0（`BALL_LAND_Y`） |
+| 下落动画 | 1.5s 缓动 |
+| 落点范围 | AreaBall 内随机 |
 
-### 4.3 球生成逻辑
-
-| 参数 | 值 | 说明 |
-| -------- | --------------------------- | --------------------------------- |
-| 生成间隔 | `BALL_SPAWN_INTERVAL = 6` | 每 6 秒检查一次 |
-| 场上上限 | `MAX_BALLS_ON_FIELD × N` | N = 有场地的玩家人数（至少为 1） |
-| 每轮数量 | N 个 | 每个有场地的玩家各生成 1 个球 |
-| 模板来源 | `ServerStorage.Ball` | 从玩家 `BallIds` 列表中随机选一个 ID，再取对应球模型克隆 |
-| 下落起点 | Y = 50（`BALL_SPAWN_DROP_HEIGHT`） | 高空掉落 |
-| 落地目标 | Y = 1.0（`BALL_LAND_Y`） | 地面高度 |
-| 下落动画 | 1.5s 缓动 | ease-in-out |
-| 落点范围 | 中心 (0,0,0) 周围 40×40 方形区域 | 随机 XZ |
-
-**流程：**
-
-```txt
-KnitStart 循环 (每 6s)
-  → N = 统计已分配场地的玩家数
-  → maxBalls = MAX_BALLS_ON_FIELD * N
-  → activeBalls.Count < maxBalls ?
-  → 遍历在线玩家，每个有场地者生成 1 个球
-    → 从玩家 BallIds 列表随机选球 ID → ServerStorage.Ball 取对应模型 Clone
-    → 随机 dropPos (XZ ±20, Y=50)
-    → PivotTo(dropPos) → _WaitForLand(ball)
-```
-
-### 4.4 踢球流程
-
-球落地后待认领 → 球被使用 → 飞向球门 → 检测进球 → 2s 后销毁。
-
-| 阶段 | 逻辑 | 参数 |
-| ---------- | ---------------------------- | ----------------------------- |
-| 待认领 | 每 0.3s 扫玩家距离 `< 6` | `AUTO_KICK_DISTANCE=6` |
-| 踢球动画 | 播放 NPC 踢球动画，等 1.3s | `KICK_ANIM_TO_FLIGHT_DELAY=1.3` |
-| 球飞行 | 弧线飞向球门后方目标，1.5s | `BALL_FLIGHT_DURATION=1.5`, arcHeight=3~10 |
-| 目标公式 | `target = goalChk + (goalChk.Unit * offset)` | offset = 13~35 random |
-| 进球检测 | 终点距 goal_chk `< 40` → 判进球 | — |
-
-### 4.5 音效
-
-| 时机 | 音效 | SoundId |
-| -------- | -------- | ------------------------------- |
-| 球下落 | Sprint | `rbxassetid://12221842`（TimePosition=1） |
-| 踢球 | shoot | `rbxassetid://8595974357` |
-| 进球 | coins | `rbxassetid://662290183` |
+---
 
 ## 5. 球门系统
 
 ### 5.1 唯一球门
 
-| 属性 | 值 |
-| --- | --- |
-| 实例路径 | `Workspace.Field_1._door` |
-| 位置 | X ≈ 116, Z ≈ 0 |
-| 数量 | 1 个（场上仅此一个球门） |
-
-`ServerStorage.Goal` 下的 44 个 door 模型（door1 ~ door44）**不在游戏玩法中使用**，作为预留资产。
-
-### 5.2 球门结构
-
-| 部件 | 类型 | 说明 |
-| --------- | ---------------------- | --------------------------- |
-| goal_chk | Part | 透明检测器，2×9×24，Anchored, CanTouch=true |
-| goal | MeshPart / UnionOperation | 球门框主体 |
-| side | Part | 球门侧柱 |
-| beam | UnionOperation / Part | 球门横梁 |
-
-### 5.3 进球检测流程
-
-球飞行终点（`targetPos` 在 `goal_chk` 后方 13~35 studs）→ 计算终点 Main 位置与 `goal_chk.Position` 距离 → `< 40` 即判进球：
-
-```txt
-球 Main MeshPart 飞行
-      │
-      ▼
-飞行结束 (elapsed >= 1.5s)
-      │
-      ▼
-计算 Main.Position 与 goal_chk.Position 距离
-      │
-      ▼
-dist < 40 → 进球 → 发放金币 → 播放音效 "coins" → 2s 后销毁球
-```
+每个球场有 1 个球门（`Field_X._door`），球门框内含 `goal_chk` Part（Size 2×9×24，Anchored，CanTouch=true，Transparent）作为进球检测器。
 
 ---
 
 ## 6. NPC 系统
 
-### 6.1 预分配轮转
+### 6.1 站位与出场
 
-10 个 NPC 从 `NPCData.luau` 预读（ID 与 `ServerStorage.Player` 子文件夹内模型名精确匹配），按槽位轮转分配：
+3 个固定站位（`Player/Slot1-3` Marker Parts，**游戏过程中不删除**），NPC 按轮转顺序从这 3 个站位依次上场。
 
-- 槽 1：NPC 1、4、7、10
-- 槽 2：NPC 2、5、8
-- 槽 3：NPC 3、6、9
+### 6.2 解锁顺序
 
-### 6.2 倒计时
+84 位球星按 `order` 字段（综合影响力评分）排序：前 10 位为顶级巨星（Messi、Ronaldo、Neymar 等），每组 10 个中前 5 位具有吸引力，保证早期体验最佳。
 
-| 阶段 | 时长 | 说明 |
-| --------------- | --------------------------- | ---------------------- |
-| 初始启动 | 30s / 60s / 90s（测试） | 错开启动 |
-| 补位 CD | 90s（3×NPC_UNLOCK_COUNTDOWN） | 到期后自动补下一个 |
-| 品质休息 CD | 2~10s（依赖品质） | 踢球后休息 |
+### 6.3 NPC 品质系统
 
-### 6.3 上场
+| 级别 | 名称 | 金币倍率 | 冷却 CD | 外观变化 |
+| --- | --- | --- | --- | --- |
+| 1 | Common | 1.0x | 10s | 基础外观 |
+| 2 | Rare | 1.5x | 8s | 球衣颜色变化 |
+| 3 | Epic | 2.0x | 6s | 金色特效 + 专属球衣 |
+| 4 | Legendary | 3.0x | 4s | 全身发光粒子 |
+| 5 | Mythic | 5.0x | 2s | 动态特效 + 特殊入场动画 |
 
-NPC 从 `ServerStorage.Player` 的 4 个子文件夹（Retro/Trending/Popular/Icons）按 `GetDescendants()` 遍历查找，精确匹配 `displayName` 后取模型并移至 `workspace`。
-站位在占位点基础上 ±3 studs 随机散开，避免叠模。
+**品质提升**：玩家重生时，场上活跃 NPC 中品质最低的 +1（上限 5）。
 
-### 6.4 NPC 品质系统
+### 6.4 ActiveNPCS 管理
 
-每个 NPC 拥有**品质等级**，影响进球金币加成和外观。
-
-**品质级别**：
-
-| 级别 | 名称 | 金币倍率 | 外观变化 |
-| -------- | ---------------- | ------------ | -------------------------- |
-| 1 | 普通 (Common) | 1.0x | 基础外观 |
-| 2 | 稀有 (Rare) | 1.5x | 球衣颜色变化 |
-| 3 | 史诗 (Epic) | 2.0x | 金色特效 + 专属球衣 |
-| 4 | 传奇 (Legendary) | 3.0x | 全身发光粒子 + 专属配件 |
-| 5 | 神话 (Mythic) | 5.0x | 动态特效 + 特殊入场动画 |
-
-**品质提升方式**：
-
-| 条件 | 效果 |
-| --------------- | --------------------------------- |
-| 玩家重生 | 当前活跃 NPC 的品质 +1（上限 5） |
-| 金币购买（可选） | 消耗 Coins 直接提升指定 NPC 品质 |
-
-**品质与解锁的关系**：
-
-- 解锁一个新的 NPC 后，该 NPC **会出现在球场上**（加入活跃池）
-- 默认解锁的 NPC 初始品质为 1（普通）
-- 已解锁但尚未进入 3 人活跃池的 NPC，会替换掉场上品质最低的 NPC
-- 品质达到 5 的 NPC 不再被替换出活跃池
+| 参数 | 说明 |
+| --- | --- |
+| 含义 | 场上正在踢球的 NPC ID 列表 |
+| 上限 | `MAX_ACTIVE_NPCS`（10） |
+| 新增时机 | 每个 NPC 解锁并上场时 |
+| 移除时机 | 超过 10 个时，FIFO 移除最早进入的 NPC |
+| 持久化 | 每次变更立即保存到 DataStore |
+| 重连恢复 | 老玩家重连时，按 `ActiveNPCS` 将 NPC 随机放置在 AreaBall |
 
 ---
 
@@ -337,33 +234,19 @@ NPC 从 `ServerStorage.Player` 的 4 个子文件夹（Retro/Trending/Popular/Ic
 
 ### 7.1 在线进度条
 
-HUD 底部展示进度条（CoreBarView）：
+HUD 底部展示进度条（CoreBarView）：10 个圆点串联金条，每 `NPC_UNLOCK_COUNTDOWN`（30s）点亮一个。总时长 5 分钟。10 人解锁后暂停，世界杯胜利后重置。
 
-- 10 个圆点（DOT）串联金条
-- 时间标签 `MM:SS` 格式，每秒轮询 `NPCProgressService:GetElapsedTime()`
-- 每轮解锁不同 NPC：圆点名称自动随偏移量更新（`CoreBarView:SetOffset(offset)`）
-- 总时长 `ONLINE_TOTAL_MINUTES`（测试 5 分钟）
-- 10 人完全解锁后进度条暂停，等待世界杯胜利后重置
+### 7.2 Coins 与等级
 
-### 7.2 Coins 展示
+`InfoBarView` 每秒轮询刷新金币数、等级和战力。新玩家默认赠送 200 Coins。
 
-`InfoBarView` 每秒轮询 `PlayerDataService:GetCoins()` 刷新。
-`Level` 和 `Power` 同时显示在 InfoBar。
+### 7.3 战术板
 
-### 7.3 战术板（Tactical Board）
+场上 Info 板投影（SurfaceGui）：`card_1` 显示本地玩家头像，`card_2~11` 显示已解锁 NPC 的 icon。世界杯胜利后重新读取解锁列表更新。
 
-**位置**：`Workspace.Field_X.Info.Main.Gui.u_card`
+### 7.4 排行榜
 
-**结构**：
-- `card_1` ~ `card_11`（ImageButton）+ `u_bench`（Frame）
-- `card_1` — 本地玩家头像（`Players:GetUserThumbnailAsync` 获取）
-- `card_2` ~ `card_11` — 对应 10 个已解锁 NPC 的 icon（`NPCList[i].icon`）
-- 纯客户端填充：KnitStart 时从 `PlayerDataService.GetUnlockedNPCs()` 读取已解锁列表并设置 Image
-- 世界杯胜利后重新读取解锁列表（已有卡片不重复填充）
-
-**填充时机**：
-1. KnitStart 初始化时
-2. WorldCupDone 事件时（下一轮解锁周期）
+Workspace 中放置了金色外框排行榜模型（SurfaceGui），按奖杯数量排名，支持 100 名滚动展示，每行含玩家头像、名称和奖杯数。
 
 ---
 
@@ -371,10 +254,8 @@ HUD 底部展示进度条（CoreBarView）：
 
 ### 8.1 等级系统
 
-玩家拥有**等级**，通过消耗 Coins 升级。等级影响进球获得的金币数量。
-
 | 等级 | 升级所需 Coins | 进球金币倍率 |
-| -------- | ------------------ | ---------------- |
+| --- | --- | --- |
 | 1 | 0（初始） | 1.0x |
 | 2 | 200 | 1.2x |
 | 3 | 500 | 1.4x |
@@ -386,275 +267,59 @@ HUD 底部展示进度条（CoreBarView）：
 | 9 | 11000 | 2.8x |
 | 10 | 15000 | 3.0x |
 
-> 注：以上数值为初始配置，后续可在 `src/shared/configs/PlayerLevels.luau` 中调整。
-
 ### 8.2 金币计算公式
 
-```txt
+```
 单次进球获得 Coins = BASE_COINS × 等级倍率 × NPC 品质倍率
 ```
 
-| 参数 | 默认值 | 说明 |
-| --------------- | ---------- | ------------------------------------------- |
-| BASE_COINS | 20 | 基础进球金币 |
-| 等级倍率 | 参见 8.1 节 | 由玩家等级决定 |
-| NPC 品质倍率 | 参见 6.4 节 | 由执行射门的 NPC 品质决定 |
+### 8.3 重生成长
 
-**示例**：
-
-| 玩家等级 | NPC 品质 | 单次进球 Coins |
-| -------------- | ------------ | ------------------ |
-| 1 (1.0x) | 普通 (1.0x) | 20 × 1.0 × 1.0 = 20 |
-| 5 (1.8x) | 史诗 (2.0x) | 20 × 1.8 × 2.0 = 72 |
-| 10 (3.0x) | 神话 (5.0x) | 20 × 3.0 × 5.0 = 300 |
-
-### 8.3 重生与成长循环
-
-玩家重生（Respawn）触发成长：
-
-```txt
-玩家死亡/重生
-    │
-    ▼
-检查场上 3 个活跃 NPC
-    │
-    ▼
-选择品质最低的 NPC → 品质 +1
-    │
-    ▼
-更新 NPC 外观（换球衣/加特效）
-    │
-    ▼
-继续游戏循环（更高品质 = 更多 Coins）
-```
+玩家重生 → 场上活跃 NPC 中品质最低的 +1 → 继续游戏循环。
 
 ---
 
 ## 9. 奖励系统
 
-### 9.1 金币系统
+### 9.1 DataStore 键
 
-| 参数 | 值 |
-| --------------- | ------------------------------ |
-| 货币名称 | Coins（金币） |
-| 存储方式 | DataStoreService（持久化） |
+| 数据类型 | DataStore 名称 | 键格式 |
+| --- | --- | --- |
+| 完整玩家数据 | `FreeKickData` | `PlayerData_{userId}` |
 
-### 9.2 DataStore 键
-
-| 数据类型 | 存储键 | 说明 |
-| -------------- | ------------------- | --------------------- |
-| Coins | PlayerCoins | 玩家金币余额 |
-| PlayerLevel | PlayerLevel | 当前等级 |
-| NPCQuality | NPCQuality_[npcId] | 各 NPC 的品质等级 |
-| UnlockedCharacters | UnlockedChars | 已解锁球星 ID 列表 |
-| BallIds | BallIds | 已拥有的球模型 ID 列表（默认 `["1"]`） |
-
-> 注：实际存储由 `PlayerDataService` 统一管理，所有字段以 JSON 格式存入 `FreeKickData` DataStore 的 `PlayerData_{userId}` 键下。
+**PlayerData 结构**：
+- `Coins`：金币余额
+- `Level`：玩家等级
+- `NPCTiers`：各 NPC 品质等级（npcId → quality）
+- `UnlockedNPCs`：已解锁 NPC ID 列表
+- `BallIds`：已拥有球模型 ID 列表
+- `Trophies`：奖杯数
+- `FirstJoinTime`：首次加入时间戳
+- `ActiveNPCS`：场上踢球 NPC ID 列表（max 10）
+- `New`：是否新玩家
 
 ---
 
-## 10. 角色系统
+## 10. 新手引导
 
-### 10.1 玩家角色
-
-玩家使用标准 R15 角色，由 StarterPlayer 中定义。玩家角色在"吃球员"阶段自动移至目标 NPC 位置。
-
-### 10.2 球星解锁
-
-两阶段解锁：
-
-**阶段 A — 进度条解锁**：
-- 每轮通过在线累积时间解锁 10 个 NPC
-- 从 `NPCData.NPCList` 按顺序批量取（第1轮 id=1~10，第2轮 id=11~20，...）
-- 每个 NPC 解锁时填充战术板 card
-
-**阶段 B — 世界杯解锁下一轮**：
-- 10 人全部解锁后，进度暂停
-- 玩家触发世界杯并获胜 → `Trophies+1`
-- `NPCProgressService:ResetProgress(player, offset)` 重置进度并偏移到下一批
-- 循环至全部 84 人解锁
-
-| 参数 | 值 |
-| --------------- | --------------------- |
-| 单轮解锁数 | 10（`ACTIVE_NPC_COUNT`） |
-| 总 NPC 数 | 84 |
-| 总轮数 | 8 轮（80人）+ 剩余4人 |
-| 进度重置时机 | 世界杯胜利后 |
+新玩家进入后等待第一个球落地 → 箭头引导依次指向：
+1. 踢一个球得分
+2. 走到 NPC 处领取
+3. 走到升级区升级
+4. 走向奖杯触发世界杯
+5. 再踢一个球
 
 ---
 
-## 11. UI 流程
+## 11. 音频系统
 
-### 11.1 游戏中 HUD
-
-```text
-┌──────────────────────────────────────┐
-│  Lv: X    金币: XXXX                 │
-│                                       │
-│             半场 / 足球场景             │
-│         ○ NPC1 ♢Rare (倒计时: 12s)   │
-│         ○ NPC2 ♢Common (倒计时: 5s)  │
-│         ○ NPC3 ♢Epic (倒计时: 20s)   │
-│                                       │
-│   [升级]  [选择球星]  [排行榜]       │
-└──────────────────────────────────────┘
-```
-
-### 11.2 进球反馈
-
-| 元素 | 说明 |
-| --------------- | ------------------------------------- |
-| 屏幕特效 | 进球闪光 + "Goal!" 文字 + Coins 数额 |
-| 音效 | 进球欢呼声（品质越高音效越丰富） |
-| 金币弹出 | +XX Coins 浮字动画（含倍率提示） |
-| 计分更新 | HUD 金币数和经验值实时增加 |
-
-### 11.3 角色选择界面
-
-| 元素 | 说明 |
-| --------------- | ----------------------------- |
-| 球星网格 | 显示所有 24 位球星头像/名称/品质星级 |
-| 锁定状态 | 已解锁 vs 未解锁（显示价格） |
-| 选中高亮 | 当前使用的球星有边框标识 |
-| 购买按钮 | 消耗金币解锁新球星 |
-| 品质显示 | 每位球星显示当前品质等级及金币加成倍率 |
-
-### 11.4 升级界面
-
-| 元素 | 说明 |
-| --------------- | ----------------------------- |
-| 当前等级 | 显示玩家等级及下一级所需 Coins |
-| 升级按钮 | 消耗 Coins 升级，显示升级后收益 |
-| 倍率预览 | 显示升级后各 NPC 进球金币变化 |
+| 时机 | 音效 | SoundId |
+| --- | --- | --- |
+| 球下落 | Sprint | `rbxassetid://12221842` |
+| 踢球 | shoot | `rbxassetid://8595974357` |
+| 进球 | coins | `rbxassetid://662290183` |
 
 ---
 
-## 12. 技术架构
-
-### 12.1 Knit 框架
-
-| 层级 | 技术 | 路径 |
-| -------- | --------------- | --------------------------------------------------- |
-| 框架 | Knit v1.7.0 | ReplicatedStorage.Packages.Knit |
-| Component | Component v2.4.8 | ReplicatedStorage.Packages.Component |
-| 服务端 | ServerScriptService.Server | `Knit.AddServicesDeep(script.services)` → `Knit.Start()` |
-| 客户端 | StarterPlayerScripts.Client | `Knit.AddControllersDeep(script.controllers)` → `Knit.Start():await()` |
-
-### 12.2 服务层设计
-
-| 服务 | 职责 |
-| ------------------- | ----------------------------------------------------------- |
-| BallService | 球管理、球飞行 tween、球回收 |
-| GoalService | 进球检测（goal_chk.Touched）、进球判定 |
-| NPCSchedulerService | NPC 选取、倒计时管理、激活/切换逻辑 |
-| NPCActionService | NPC 自动寻路到球、播放踢球动画 |
-| RewardService | 金币结算、等级管理、NPC 品质管理、DataStore 读写、角色解锁 |
-| PlayerService | 玩家加入/离开、角色迁移（吃球员） |
-
-### 12.3 控制器层设计
-
-| 控制器 | 职责 |
-| ------------------ | -------------------------------------------------------- |
-| UIController | HUD 显示（等级、金币、倒计时）、升级界面、进球反馈、角色选择界面 |
-| CameraController | 吃球员及射球时镜头切换/跟随 |
-| NPCTimerController | 头顶倒计时 BillboardGui 更新 |
-
-### 12.4 工具依赖
-
-| 包 | 用途 |
-| ----------- | ---------------- |
-| Knit | 服务/控制器框架 |
-| Component | 面向对象组件系统 |
-| Loader | 模块加载管理 |
-| TableUtil | 表格操作工具 |
-| Timer | 计时器/倒计时 |
-| Input | 输入管理 |
-| Trove | 连接/资源清理 |
-| Promise | 异步操作 |
-| Shake | 镜头震动 |
-| Signal | 自定义事件 |
-| WaitFor | 等待实例出现 |
-| Topbarplus | 顶部栏 UI |
-| Janitor | 资源自动清理 |
-| Satchel | 数据存储 |
-| Tree | 树形结构工具 |
-| Sift | 表格深度操作 |
-
-### 12.5 数据存储
-
-| 数据类型 | 存储键 | 说明 |
-| -------------- | ------------------- | --------------------- |
-| Coins | PlayerCoins | 玩家金币余额 |
-| PlayerLevel | PlayerLevel | 当前等级 |
-| NPCQuality | NPCQuality_[npcId] | 各 NPC 的品质等级（1~5） |
-| UnlockedCharacters | UnlockedChars | 已解锁球星 ID 列表 |
-
----
-
-## 13. 开发路线图
-
-### 13.1 第一阶段 — 核心循环
-
-- [ ] 实现 NPCSchedulerService：从 24 NPC 中选 3 个激活，管理倒计时
-- [ ] 实现 NPCActionService：NPC 自动寻路到最近球 + 播放踢球动画
-- [ ] 实现 BallService：球管理、飞行 tween
-- [ ] 实现 GoalService：goal_chk Touch 检测进球
-- [ ] 实现 RewardService + DataStore 金币/等级/品质持久化
-- [ ] 实现 PlayerService：玩家自动移至目标 NPC（吃球员）、重生品质提升
-
-### 13.2 第二阶段 — 角色与 UI
-
-- [ ] 角色选择界面与 NPC 解锁系统（含品质星级显示）
-- [ ] 玩家等级系统（消耗 Coins 升级，倍率提升）
-- [ ] NPC 品质系统（重生提升、外观变化）
-- [ ] 倒计时 HUD（NPC 头顶 + 屏幕 UI）
-- [ ] 金币与等级显示、进球反馈（特效、音效、浮字）
-- [ ] 镜头控制（射球时跟随球）
-
-### 13.3 第三阶段 — 打磨
-
-- [ ] 多语言支持（中文/英文）
-- [ ] 性能优化与防作弊
-- [ ] 更多 NPC 品质外观与动画
-- [ ] 每日奖励系统
-- [ ] 球/球门外观商店
-- [ ] 数值平衡调整
-- [ ] 音频系统（MusicService 已完成）
-
----
-
-## 14. 音频系统
-
-### 14.1 音频结构
-
-所有音频资源放置在 `SoundService` 下，不通过 Rojo 管理，直接在 Studio 中手动放置：
-
-| 容器 | 类型 | 说明 |
-| ----------------------------- | ------------ | -------------------------------- |
-| `SoundService.MusicGroup` | SoundGroup | 背景音乐，当前仅 `BGM_lobby` |
-| `SoundService.SoundGroup` | SoundGroup | 游戏音效，含进球、拾取、冲刺、踢球等 |
-
-### 14.2 MusicService 职责（服务端）
-
-`MusicService`（Knit Service，`src/server/services/MusicService.luau`）负责背景音乐和全局音效：
-
-- `PlayMusic(name)` — 播放指定背景音乐（自动停止上一首）
-- `StopMusic()` — 停止当前背景音乐
-- `PlaySound(name, parent?)` — 播放指定音效，可选指定父级（在父级位置发声）
-- 服务端权威播放：音频在服务端实例化，所有客户端都能听到
-- 音效自动清理：播放完毕后自动销毁 Sound 实例
-
-### 14.3 SoundController 职责（客户端）
-
-`SoundController`（Knit Controller，`src/client/controllers/SoundController.luau`）负责客户端本地音效：
-
-- `PlayShoot(parent?)` — 播放踢球音效，默认挂载玩家角色位置发声
-- 监听 `ReplicatedStorage.SoundEvent` RemoteEvent，收到 `"shoot"` 时触发
-- 服务端 `AutoKickService` 在 `_FlyBallToGoal` 中通过 `SoundEvent:FireAllClients("shoot")` 通知
-- 自动清理：`Sound.Ended` 触发后自动销毁
-
----
-
-文档版本: v1.1
-最后更新: 2026-06-22
-维护者: (待填写)
+文档版本: v2.0
+最后更新: 2026-06-24

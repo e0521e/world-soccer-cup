@@ -209,6 +209,8 @@ local UIController = Knit.CreateController({
 						local offset = #unlocked + 1
 						self._coreBar:SetOffset(offset)
 						self._coreBar:UpdateTime(0)
+						local lbCtrl = Knit.GetController("LeaderboardController")
+						if lbCtrl then lbCtrl:Refresh() end
 					end
 				end)
 			end
@@ -376,15 +378,15 @@ local UIController = Knit.CreateController({
 		local originX = if screenPos.Z > 0 then screenPos.X else viewport.X / 2
 		local originY = if screenPos.Z > 0 then screenPos.Y else viewport.Y * 0.7
 
-		local coinLabel = self._infoBar and self._infoBar._coinLabel
-		if not coinLabel then return end
+		local coinIcon = self._screenGui and self._screenGui:FindFirstChild("InfoBar"):FindFirstChild("CoinSegment"):FindFirstChild("Icon")
+		if not coinIcon then return end
 
-		local absPos = coinLabel.AbsolutePosition
-		local absSize = coinLabel.AbsoluteSize
+		local absPos = coinIcon.AbsolutePosition
+		local absSize = coinIcon.AbsoluteSize
 		if absSize.X == 0 or absSize.Y == 0 then return end
 
-		local targetX = absPos.X + absSize.X * 0.75
-		local targetY = absPos.Y + absSize.Y / 2
+		local targetX = absPos.X + absSize.X / 2
+		local targetY = absPos.Y + absSize.Y
 
 		task.spawn(function()
 			for i = 1, 8 do
@@ -394,17 +396,17 @@ local UIController = Knit.CreateController({
 				coin.Font = Enum.Font.GothamBold
 				coin.TextScaled = true
 				coin.BackgroundTransparency = 1
-				coin.Size = UDim2.new(0, 26, 0, 26)
+				coin.Size = UDim2.new(0, 52, 0, 52)
 				coin.ZIndex = 200
 				coin.Parent = self._screenGui
 
 				local spreadX = (math.random() - 0.5) * 60
 				local spreadY = (math.random() - 0.5) * 40 - 20
-				coin.Position = UDim2.new(0, originX + spreadX - 13, 0, originY + spreadY - 13)
+				coin.Position = UDim2.new(0, originX + spreadX - 26, 0, originY + spreadY - 26)
 
 				task.delay((i - 1) * 0.04, function()
 					local tween = TweenService:Create(coin, TweenInfo.new(1.0 + math.random() * 0.3, Enum.EasingStyle.Quad, Enum.EasingDirection.In), {
-						Position = UDim2.new(0, targetX - 13, 0, targetY - 13),
+						Position = UDim2.new(0, targetX - 26, 0, targetY - 26),
 						Size = UDim2.new(0, 14, 0, 14),
 						TextTransparency = 1,
 					})
@@ -418,12 +420,12 @@ local UIController = Knit.CreateController({
 	end,
 
 	_CreateHUD = function(self)
-		self._screenGui = Instance.new("ScreenGui")
-		self._screenGui.Name = "FreeKickHUD"
-		self._screenGui.Parent = Players.LocalPlayer:WaitForChild("PlayerGui")
-		self._screenGui.ResetOnSpawn = false
-		self._screenGui.IgnoreGuiInset = true
-		self._screenGui.ZIndexBehavior = Enum.ZIndexBehavior.Sibling
+		local playerGui = Players.LocalPlayer:WaitForChild("PlayerGui")
+		for _ = 1, 30 do
+			self._screenGui = playerGui:WaitForChild("FreeKickHUD", 1)
+			if self._screenGui and self._screenGui:FindFirstChild("CoreBar") then break end
+			task.wait(0.5)
+		end
 
 		self._toast = ToastView.new(self._screenGui)
 		self._coreBar = CoreBarView.new(self._screenGui)
@@ -441,6 +443,25 @@ local UIController = Knit.CreateController({
 		self._actionPanel:SetShopCallback(function()
 			self._shopView._activeTab = "Products"
 			self._shopView:Open()
+		end)
+
+		self._actionPanel:SetLeaderboardCallback(function()
+			local leaderboardModel = workspace:FindFirstChild("Leaderboard")
+			if leaderboardModel then
+				local pos = leaderboardModel:GetPrimaryPartCFrame()
+				if pos then
+					local char = Players.LocalPlayer.Character
+					if char then
+						local root = char:FindFirstChild("HumanoidRootPart")
+						if root then
+							root.CFrame = CFrame.lookAt(
+								Vector3.new(pos.X, pos.Y + 3, pos.Z - 8),
+								Vector3.new(pos.X, pos.Y + 3, pos.Z)
+							)
+						end
+					end
+				end
+			end
 		end)
 
 		self._actionPanel:SetRebirthCallback(function()
@@ -473,6 +494,9 @@ local UIController = Knit.CreateController({
 		for i = 1, Constants.ACTIVE_NPC_COUNT do
 			self._coreBar:LoadNPCHead(i)
 		end
+
+		local unlocked = self._pds:GetUnlockedNPCs()
+		self._coreBar:SetOffset(#unlocked + 1)
 
 	end,
 })

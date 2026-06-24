@@ -31,7 +31,7 @@ local BallSpawnService = Knit.CreateService({
     _GetPlayerBallCap = function(self, player)
         local pds = Knit.GetService("PlayerDataService")
         local unlocked = pds:GetUnlockedNPCs(player)
-        return math.max(3, #unlocked)
+        return math.max(3, math.min(#unlocked, Constants.MAX_BALLS_PER_PLAYER))
     end,
 
     _StartPlayerLoop = function(self, player)
@@ -85,7 +85,7 @@ local BallSpawnService = Knit.CreateService({
         mainPart.Anchored = true
         mainPart.CanCollide = false
 
-        ball.Parent = workspace
+        ball.Parent = workspace:FindFirstChild("FieldBalls") or workspace
 
         local dropPos = Vector3.new(
             (math.random() - 0.5) * 40,
@@ -180,6 +180,7 @@ local BallSpawnService = Knit.CreateService({
                             local dist = (root.Position - mainPart.Position).Magnitude
                             if dist < Constants.AUTO_KICK_DISTANCE then
                                 ballData.inUse = true
+                                ballData.inUseTime = tick()
                                 self:_PlayerKickBall(player, ball, ballData)
                                 return
                             end
@@ -310,7 +311,14 @@ local BallSpawnService = Knit.CreateService({
 
     GetActiveBallPositions = function(self)
         local positions = {}
-        for _, data in pairs(self._activeBalls) do
+        local now = tick()
+        for ball, data in pairs(self._activeBalls) do
+            if data.inUse then
+                if data.inUseTime and now - data.inUseTime > 15 then
+                    data.inUse = false
+                    data.inUseTime = nil
+                end
+            end
             if not data.inUse and data.landPos then
                 table.insert(positions, {
                     position = data.landPos,
@@ -325,6 +333,7 @@ local BallSpawnService = Knit.CreateService({
         local data = self._activeBalls[ballModel]
         if data and not data.inUse then
             data.inUse = true
+            data.inUseTime = tick()
             return data
         end
         return nil

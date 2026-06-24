@@ -11,11 +11,7 @@ local NPCProgressService = Knit.CreateService({
 		GetElapsedTime = function(self, player)
 			return self.Server:GetElapsedTime(player)
 		end,
-		GetQueueSize = function(self, player)
-			return self.Server:GetQueueSize(player)
-		end,
 		OnTimeTick = Knit.CreateSignal(),
-		OnMinuteReached = Knit.CreateSignal(),
 		OnTeamComplete = Knit.CreateSignal(),
 	},
 
@@ -27,72 +23,51 @@ local NPCProgressService = Knit.CreateService({
 		return pd and pd.totalSeconds or 0
 	end,
 
-	GetQueueSize = function(self, player)
-		local pd = self._playerData[player]
-		return pd and #pd.queue or 0
+	ResetProgress = function(self, player, offset)
+		local timer = Knit.GetService("NPCTimerService")
+		timer:SetCurrentOffset(player, offset)
+		self:_InitPlayer(player, offset, true)
 	end,
 
-	DequeueNextNPC = function(self, player)
-		local pd = self._playerData[player]
-		if not pd or #pd.queue == 0 then return nil end
-		return table.remove(pd.queue, 1)
-	end,
+	_InitPlayer = function(self, player, offset, noRestore)
+		offset = offset or 1
 
-	ResetProgress = function(self, player, startIndex)
-		if self._playerLoops[player] then
-			self._playerLoops[player] = false
-		end
-		self._playerData[player] = nil
-		self:_InitPlayer(player, startIndex or 1)
-	end,
-
-	_InitPlayer = function(self, player, startIndex)
 		if self._playerLoops[player] then
 			self._playerLoops[player] = false
 			task.wait()
 		end
-		startIndex = startIndex or 1
+
+		local timer = Knit.GetService("NPCTimerService")
+		if not noRestore then
+			timer:RestoreFromActiveNPCS(player)
+		end
+		timer:InitCycle(player, offset)
+
 		local pd = {
 			totalSeconds = 0,
-			minuteCount = 0,
-			queue = {},
-			teamComplete = false,
-			startIndex = startIndex,
+			lastTick = 0,
+			lastUnlockCount = 0,
 		}
 		self._playerData[player] = pd
 		self._playerLoops[player] = true
-		local active = true
-
-		local totalSecondsLimit = Constants.ONLINE_TOTAL_MINUTES * 60
-		local unlockSlots = Constants.ACTIVE_NPC_COUNT
-		local npcInterval = math.floor(totalSecondsLimit / unlockSlots)
 
 		task.spawn(function()
-			while active and self._playerLoops[player] do
+			while self._playerLoops[player] do
 				task.wait(1)
-				pd.totalSeconds = pd.totalSeconds + 1
+				pd.totalSeconds += 1
 
-				local newMin = math.floor(pd.totalSeconds / npcInterval)
-				if newMin > pd.minuteCount then
-					for i = pd.minuteCount + 1, newMin do
-						if i <= Constants.ACTIVE_NPC_COUNT then
-							local npcIdx = pd.startIndex + i - 1
-							local npcData = NPCData.NPCList[npcIdx]
-							if npcData then
-								table.insert(pd.queue, npcData.id)
-								local pds = Knit.GetService("PlayerDataService")
-								pds:AddUnlockedNPC(player, npcData.id)
-								self.Client.OnMinuteReached:Fire(player, i, npcData.id, npcData.displayName)
-							end
-						end
+				-- tick NPCTimerService to update countdowns + slot cycling
+				timer:Tick(player)
+				self.Client.OnTimeTick:Fire(player, pd.totalSeconds)
+
+				local unlocked = timer:GetUnlockedInCycle(player)
+				if unlocked > pd.lastUnlockCount then
+					pd.lastUnlockCount = unlocked
+
+					-- check team complete
+					if unlocked >= Constants.ACTIVE_NPC_COUNT then
+						self.Client.OnTeamComplete:Fire(player)
 					end
-					pd.minuteCount = newMin
-				end
-
-				if pd.minuteCount >= Constants.ACTIVE_NPC_COUNT and not pd.teamComplete then
-					pd.teamComplete = true
-					self.Client.OnTeamComplete:Fire(player)
-					break
 				end
 			end
 		end)

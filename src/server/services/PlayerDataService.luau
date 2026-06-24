@@ -48,6 +48,7 @@ local PlayerDataService = Knit.CreateService({
 
 		OnCoinsChanged = Knit.CreateSignal(),
 		OnLevelUp = Knit.CreateSignal(),
+		OnTrophiesChanged = Knit.CreateSignal(),
 	},
 
 	_playerData = {},
@@ -66,6 +67,8 @@ local PlayerDataService = Knit.CreateService({
 			if success and data then
 				if data.Trophies == nil then data.Trophies = 0 end
 				if data.BallIds == nil then data.BallIds = { "1" } end
+				if data.FirstJoinTime == nil then data.FirstJoinTime = DateTime.now().UnixTimestampMillis end
+				if data.ActiveNPCS == nil then data.ActiveNPCS = {} end
 				self._playerData[player] = data
 				loaded = true
 			end
@@ -73,13 +76,15 @@ local PlayerDataService = Knit.CreateService({
 
 		if not loaded then
 			self._playerData[player] = {
-				Coins = 0,
+				Coins = 200,
 				Level = 1,
 				NPCTiers = {},
 				UnlockedNPCs = {},
 				BallIds = { "1" },
 				Trophies = 0,
 				New = true,
+				FirstJoinTime = DateTime.now().UnixTimestampMillis,
+				ActiveNPCS = {},
 			}
 			print("[PlayerDataService] new player", player.Name)
 		else
@@ -144,6 +149,18 @@ local PlayerDataService = Knit.CreateService({
 	end,
 
 	OnPlayerRemoving = function(self, player)
+		local data = self._playerData[player]
+		if data then
+			local timerService = Knit.GetService("NPCTimerService")
+			local active = timerService._activeNPCs[player.Name]
+			if active then
+				local ids = {}
+				for _, entry in ipairs(active) do
+					table.insert(ids, entry.npcId)
+				end
+				data.ActiveNPCS = ids
+			end
+		end
 		self._lastSave[player] = 0
 		self:_ThrottledSave(player)
 		self._dirty[player] = nil
@@ -263,6 +280,8 @@ local PlayerDataService = Knit.CreateService({
 		local data = self._playerData[player]
 		if not data then return end
 		data.Trophies += delta
+		self.Client.OnTrophiesChanged:Fire(player, data.Trophies, delta)
+		self:_MarkDirty(player)
 	end,
 
 	IsNewPlayer = function(self, player)
@@ -342,6 +361,23 @@ local PlayerDataService = Knit.CreateService({
 			myPower = myPower,
 			targetPower = targetPower,
 		}
+	end,
+
+	GetActiveNPCS = function(self, player)
+		local data = self._playerData[player]
+		return data and data.ActiveNPCS or {}
+	end,
+
+	SetActiveNPCS = function(self, player, slots)
+		local data = self._playerData[player]
+		if data then
+			data.ActiveNPCS = slots
+		end
+	end,
+
+	GetFirstJoinTime = function(self, player)
+		local data = self._playerData[player]
+		return data and data.FirstJoinTime or 0
 	end,
 
 	KnitInit = function(self)

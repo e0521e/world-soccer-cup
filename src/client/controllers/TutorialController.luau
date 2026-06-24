@@ -177,6 +177,19 @@ local TutorialController = Knit.CreateController({
 		end
 		print("[Tutorial] field:", field)
 
+		-- Wait for first ball to land before starting guide
+		local ballSpawn = Knit.GetService("BallSpawnService")
+		local ballLanded = false
+		local landConn = ballSpawn.OnBallLanded:Connect(function()
+			ballLanded = true
+		end)
+		for _ = 1, 60 do
+			if ballLanded then break end
+			task.wait(0.5)
+		end
+		landConn:Disconnect()
+		print("[Tutorial] ball landed, starting guide")
+
 		---- Step 1: Kick a ball ----
 		print("[Tutorial] Step 1: waiting for ball")
 		local ball = findNearestBall()

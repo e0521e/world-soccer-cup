@@ -43,26 +43,6 @@ local AutoKickService = Knit.CreateService({
             end
         end
 
-        if not nearest then
-            local ballFolder = game:GetService("ServerStorage"):FindFirstChild("Ball")
-            if ballFolder then
-                local template = ballFolder:FindFirstChild("ball1")
-                if template and template:IsA("Model") then
-                    local ball = template:Clone()
-                    ball.Name = "FieldBall_" .. tostring(tick())
-                    local mainPart = ball:FindFirstChild("Main")
-                    if mainPart then
-                        local spawnPos = Vector3.new(primary.Position.X + 8, 0.5, primary.Position.Z)
-                        mainPart.Position = spawnPos
-                        mainPart.Anchored = true
-                        mainPart.CanCollide = false
-                        ball.Parent = workspace
-                        nearest = { model = ball, position = spawnPos }
-                    end
-                end
-            end
-        end
-
         if not nearest then return end
 
         ballSpawn:ClaimBall(nearest.model)
@@ -233,9 +213,6 @@ local AutoKickService = Knit.CreateService({
 
             local rewardService = Knit.GetService("RewardService")
             rewardService:AwardGoal(player, slotData.npcId)
-
-            local timerService = Knit.GetService("NPCTimerService")
-            timerService:ResetSlot(player, slotData)
         end
 
         task.delay(2, function()

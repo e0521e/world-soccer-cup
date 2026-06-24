@@ -71,42 +71,26 @@ local PlayerService = Knit.CreateService({
         self.Client.OnRespawnQualityUp:Fire(player)
 
         local timerService = Knit.GetService("NPCTimerService")
-        local slots = timerService._playerSlots[player]
-        if not slots then return end
+        local active = timerService._activeNPCs[player.Name]
+        if not active or #active == 0 then return end
 
-        local lowestSlot = nil
+        local lowestEntry = nil
         local lowestQuality = Constants.MAX_NPC_QUALITY + 1
-        for _, slotData in pairs(slots) do
-            if slotData.quality < lowestQuality then
-                lowestQuality = slotData.quality
-                lowestSlot = slotData
+        local rewardService = Knit.GetService("RewardService")
+        for _, entry in ipairs(active) do
+            local quality = rewardService:GetNPCQuality(player, entry.npcId)
+            if quality < lowestQuality then
+                lowestQuality = quality
+                lowestEntry = entry
             end
         end
 
-        if lowestSlot and lowestQuality < Constants.MAX_NPC_QUALITY then
-            local rewardService = Knit.GetService("RewardService")
-            rewardService:UpgradeNPCQuality(player, lowestSlot.npcId)
-            lowestSlot.quality = lowestQuality + 1
-
-            local qualityData = NPCData.QualityTiers[lowestSlot.quality]
-            lowestSlot.qualityMultiplier = qualityData.multiplier
-
-            timerService:_ApplyQualityVisual(lowestSlot.npcModel, lowestSlot.quality)
-
-            local npcModel = lowestSlot.npcModel
-            if npcModel then
-                local primary = npcModel:FindFirstChild("HumanoidRootPart") or npcModel
-                local existing = primary:FindFirstChild("TimerGui")
-                if not existing then
-                    timerService:_PlaceNPCOnField(player, lowestSlot)
-                end
-            end
+        if lowestEntry and lowestQuality < Constants.MAX_NPC_QUALITY then
+            rewardService:UpgradeNPCQuality(player, lowestEntry.npcId)
         end
     end,
 
     InitializePlayer = function(self, player)
-        local timerService = Knit.GetService("NPCTimerService")
-        timerService:ActivateNPCs(player)
     end,
 
     _setupRespawn = function(self, player)
@@ -167,14 +151,14 @@ local PlayerService = Knit.CreateService({
                         returnTween.Completed:Wait()
                     end
 
-                    pds:AddTrophies(player, 1)
-                    pds:SavePlayerData(player)
+					pds:AddTrophies(player, 1)
+					pds:SavePlayerData(player)
+					local leaderboard = Knit.GetService("LeaderboardService")
+					leaderboard:UpdateRanking(player)
 
                     local npcProg = Knit.GetService("NPCProgressService")
-                    local timerService = Knit.GetService("NPCTimerService")
                     local newOffset = #pds:GetUnlockedNPCs(player) + 1
                     npcProg:ResetProgress(player, newOffset)
-                    timerService:ActivateNPCs(player, newOffset)
 
                     if noticeEvent then
                         noticeEvent:FireClient(player, "WorldCupDone")
