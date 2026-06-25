@@ -24,12 +24,18 @@ function ToastView.new(screenGui: Instance)
 	return self
 end
 
+local SIDE_POSITIONS = {
+	left = UDim2.new(0.02, 0, 0.38, 0),
+	right = UDim2.new(0.98, 0, 0.38, 0),
+}
+
 function ToastView:Show(options)
 	local opts = {
 		emoji = options.emoji or "",
 		title = options.title or "",
 		body = options.body or "",
 		duration = options.duration or DEFAULT_DURATION,
+		side = options.side or nil,
 	}
 	table.insert(self._queue, opts)
 	self:_ProcessQueue()
@@ -111,6 +117,14 @@ end
 function ToastView:_Display(opts)
 	local duration = opts.duration or DEFAULT_DURATION
 
+	local savedPosition = self._container.Position
+	if opts.side then
+		self._container.Position = SIDE_POSITIONS[opts.side] or savedPosition
+		self._container.AnchorPoint = if opts.side == "right" then Vector2.new(1, 0.5) else Vector2.new(0, 0.5)
+	else
+		self._container.AnchorPoint = Vector2.new(0.5, 0.5)
+	end
+
 	local borderGlow = Instance.new("Frame")
 	borderGlow.Name = "ToastGlow"
 	borderGlow.Size = UDim2.new(0.94, 0, 0, 0)
@@ -183,6 +197,8 @@ function ToastView:_Display(opts)
 		outTweenBg.Completed:Connect(function()
 			bg:Destroy()
 			borderGlow:Destroy()
+			self._container.Position = UDim2.new(0.5, 0, 0.38, 0)
+			self._container.AnchorPoint = Vector2.new(0.5, 0.5)
 			self._isDisplaying = false
 			self:_ProcessQueue()
 		end)

@@ -232,16 +232,14 @@ function ShopView:_ConnectShopSignals()
 		return
 	end
 	self._shopService = svc
-	svc.OnPurchaseComplete:Connect(function(player, itemType, itemId, info)
-		if player ~= Players.LocalPlayer then return end
-			self._statusBar.Text = "✅ " .. (info.name or "") .. " purchased!"
+	svc.OnPurchaseComplete:Connect(function(itemType, itemId, info)
+		self._statusBar.Text = "✅ " .. (info.name or "") .. " purchased!"
 		self:UpdateCoinsDisplay()
 		task.delay(3, function()
 			self._statusBar.Text = ""
 		end)
 	end)
-	svc.OnPurchaseFailed:Connect(function(player, itemType, itemId, reason)
-		if player ~= Players.LocalPlayer then return end
+	svc.OnPurchaseFailed:Connect(function(itemType, itemId, reason)
 		self._statusBar.Text = "❌ " .. (reason or "Purchase failed")
 		task.delay(3, function()
 			self._statusBar.Text = ""

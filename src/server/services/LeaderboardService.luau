@@ -1,4 +1,5 @@
 local Knit = require(game:GetService("ReplicatedStorage").Packages.Knit)
+local Constants = require(game:GetService("ReplicatedStorage").Shared.constants.Constants)
 local Players = game:GetService("Players")
 local DataStoreService = game:GetService("DataStoreService")
 
@@ -42,26 +43,28 @@ local LeaderboardService = Knit.CreateService({
 		if ok then
 			self._cacheTime = 0
 			print("[Leaderboard] SetAsync OK for", player.Name, trophies)
-			local now = tick()
-			if now - self._broadcastCooldown >= 2 then
-				self._broadcastCooldown = now
-				self.Client.OnLeaderboardUpdated:Fire(player)
-			elseif not self._broadcastThread then
-				self._broadcastThread = task.delay(2 - (now - self._broadcastCooldown), function()
-					self._broadcastThread = nil
-					self._broadcastCooldown = tick()
-					self.Client.OnLeaderboardUpdated:Fire()
-				end)
-			end
 		else
 			warn("[Leaderboard] SetAsync failed:", err)
+			return
+		end
+
+		local now = tick()
+		if now - self._broadcastCooldown >= 2 then
+			self._broadcastCooldown = now
+			self.Client.OnLeaderboardUpdated:Fire(player)
+		elseif not self._broadcastThread then
+			self._broadcastThread = task.delay(2 - (now - self._broadcastCooldown), function()
+				self._broadcastThread = nil
+				self._broadcastCooldown = tick()
+				self.Client.OnLeaderboardUpdated:Fire()
+			end)
 		end
 	end,
 
 	GetTopPlayers = function(self, requestingPlayer, count)
 		count = math.clamp(count or 10, 1, LEADERBOARD_SIZE)
 		local now = tick()
-		if now - self._cacheTime < 10 and #self._cachedTop > 0 then
+		if now - self._cacheTime < Constants.LEADERBOARD_CACHE_SECONDS and #self._cachedTop > 0 then
 			return self._cachedTop
 		end
 
@@ -85,7 +88,6 @@ local LeaderboardService = Knit.CreateService({
 		local data = pages:GetCurrentPage()
 		print("[Leaderboard] GetCurrentPage entries:", #data)
 
-		-- load player name mapping from DataStore if available
 		local nameMap = {}
 		if self._nameDs then
 			local ok2, names = pcall(function()
@@ -159,11 +161,7 @@ local LeaderboardService = Knit.CreateService({
 			local pds = Knit.GetService("PlayerDataService")
 			local trophies = pds:GetTrophies(player)
 			print("[Leaderboard] PlayerAdded", player.Name, "trophies", trophies)
-			if self._orderedDs then
-				pcall(function()
-					self._orderedDs:SetAsync(tostring(player.UserId), trophies)
-				end)
-			end
+			self:UpdateRanking(player)
 			if self._nameDs then
 				pcall(function()
 					self._nameDs:UpdateAsync(PLAYER_NAMES_KEY, function(old)

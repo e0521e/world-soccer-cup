@@ -35,6 +35,7 @@ local UIController = Knit.CreateController({
 	_nameTagConn = nil,
 	_tacticalBoardCards = {},
 	_tacticalBoardFilled = false,
+	_slotCountdowns = {},
 
 	_UpdateNameTag = function(self)
 		if self._nameTagConn then
@@ -105,13 +106,36 @@ local UIController = Knit.CreateController({
 		end)
 	end,
 
+	_FindSlotModel = function(self, slotId)
+		local playerName = Players.LocalPlayer.Name
+		local function search(container)
+			for _, obj in ipairs(container:GetChildren()) do
+				if obj:IsA("Model") then
+					local sid = obj:GetAttribute("SlotId")
+					local owner = obj:GetAttribute("OwnerPlayer")
+					if sid ~= nil and owner == playerName and sid == slotId then
+						return obj
+					end
+				end
+				local found = search(obj)
+				if found then return found end
+			end
+			return nil
+		end
+		local container = Workspace:FindFirstChild("FieldNPCs")
+		if container then
+			local found = search(container)
+			if found then return found end
+		end
+		return search(Workspace)
+	end,
+
 	KnitStart = function(self)
 		self._pds = Knit.GetService("PlayerDataService")
 		self._autoKick = Knit.GetService("AutoKickService")
 		self._npcProgress = Knit.GetService("NPCProgressService")
 
-		self._pds.OnLevelUp:Connect(function(player, level, multiplier)
-			if player ~= Players.LocalPlayer then return end
+		self._pds.OnLevelUp:Connect(function(level, multiplier)
 			print("[OnLevelUp] level", level, "multiplier", multiplier)
 			self._toast:Show({
 				emoji = "⬆",
@@ -136,13 +160,11 @@ local UIController = Knit.CreateController({
 
 		self._lastKickPos = Vector3.new()
 
-		self._autoKick.OnBallFlying:Connect(function(player, slotId, startPos, targetPos)
-			if player ~= Players.LocalPlayer then return end
+		self._autoKick.OnBallFlying:Connect(function(slotId, startPos, targetPos)
 			self._lastKickPos = startPos
 		end)
 
-		ballSpawn.OnBallFlying:Connect(function(player, ballName, startPos, targetPos)
-			if player ~= Players.LocalPlayer then return end
+		ballSpawn.OnBallFlying:Connect(function(ballName, startPos, targetPos)
 			self._lastKickPos = startPos
 		end)
 
@@ -254,39 +276,74 @@ local UIController = Knit.CreateController({
 			end
 		end)
 
-		self._autoKick.OnGoalScored:Connect(function(player, slotId, npcId)
-			if player ~= Players.LocalPlayer then return end
+		self._autoKick.OnGoalScored:Connect(function()
+		end)
+
+		ballSpawn.OnPlayerGoal:Connect(function()
 			self._overlay:ShowGoal()
-			self._toast:Show({
-				emoji = "⚽",
-				title = "GOAL!",
-				duration = 2,
-			})
+			--self._toast:Show({
+			--	emoji = "⚽",
+			--	title = "GOAL!",
+			--	duration = 2,
+			--})
 		end)
 
-		ballSpawn.OnPlayerGoal:Connect(function(player, distance)
-			if player ~= Players.LocalPlayer then return end
-		end)
-
-		npcTimer.OnNPCActivated:Connect(function(player, slotId, npcId, duration)
-			if player ~= Players.LocalPlayer then return end
+		npcTimer.OnNPCActivated:Connect(function(slotId, npcId, duration)
 			local name = getNPCName(npcId)
 			self._toast:Show({
 				emoji = "⏳",
 				title = name,
 				body = "Ready in <b>" .. tostring(duration) .. "</b>s",
 				duration = 2,
+				side = "left",
 			})
 		end)
-		npcTimer.OnTimerExpired:Connect(function(player, slotId, npcId)
-			if player ~= Players.LocalPlayer then return end
-			local name = getNPCName(npcId)
-			self._toast:Show({
-				emoji = "✅",
-				title = name,
-				body = "Ready! Press <b>E</b>",
-				duration = 3,
-			})
+		npcTimer.OnTimerUpdated:Connect(function(slotId, remaining)
+			local sd = self._slotCountdowns[slotId]
+			if sd then
+				if not sd.gui or not sd.gui.Parent then
+					self._slotCountdowns[slotId] = nil
+					sd = nil
+				else
+					sd.label.Text = tostring(remaining)
+					sd.label.TextColor3 = if remaining <= 5 then Color3.new(1, 0.2, 0.2) else Color3.new(1, 1, 1)
+				end
+			end
+			if not sd then
+				local model = self:_FindSlotModel(slotId)
+				if model then
+					local primary = model:FindFirstChild("HumanoidRootPart") or model:FindFirstChildWhichIsA("BasePart")
+					if primary then
+						local gui = Instance.new("BillboardGui")
+						gui.Name = "SlotCountdownGui"
+						gui.Size = UDim2.new(0, 60, 0, 30)
+						gui.StudsOffset = Vector3.new(0, 5, 0)
+						gui.MaxDistance = 80
+						gui.Parent = primary
+
+						local label = Instance.new("TextLabel")
+						label.Size = UDim2.new(1, 0, 1, 0)
+						label.BackgroundTransparency = 1
+						label.Text = tostring(remaining)
+						label.TextColor3 = Color3.new(1, 1, 1)
+						label.TextStrokeColor3 = Color3.new(0, 0, 0)
+						label.TextStrokeTransparency = 0.3
+						label.TextScaled = true
+						label.Font = Enum.Font.GothamBold
+						label.Parent = gui
+
+						self._slotCountdowns[slotId] = { gui = gui, label = label }
+					end
+				end
+			end
+		end)
+		npcTimer.OnTimerExpired:Connect(function(slotId, npcId)
+			local sd = self._slotCountdowns[slotId]
+			if sd then
+				sd.gui:Destroy()
+				self._slotCountdowns[slotId] = nil
+			end
+
 		end)
 
 		self._infoBar:UpdateCoins(self._pds:GetCoins())
@@ -468,15 +525,16 @@ local UIController = Knit.CreateController({
 		self._actionPanel:SetLeaderboardCallback(function()
 			local leaderboardModel = workspace:FindFirstChild("Leaderboard")
 			if leaderboardModel then
-				local pos = leaderboardModel:GetPrimaryPartCFrame()
-				if pos then
+				local cf = leaderboardModel:GetPrimaryPartCFrame()
+				if cf then
 					local char = Players.LocalPlayer.Character
 					if char then
 						local root = char:FindFirstChild("HumanoidRootPart")
 						if root then
+							local look = cf.LookVector
 							root.CFrame = CFrame.lookAt(
-								Vector3.new(pos.X, pos.Y + 3, pos.Z - 8),
-								Vector3.new(pos.X, pos.Y + 3, pos.Z)
+								cf.Position + look * 8,
+								cf.Position
 							)
 						end
 					end

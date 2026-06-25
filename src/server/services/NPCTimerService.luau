@@ -21,7 +21,7 @@ local NPCTimerService = Knit.CreateService({
 	},
 
 	_slotPositions = {},   -- [playerName] = { Vector3, Vector3, Vector3 }
-	_slotNPCs = {},         -- [playerName][slotIdx] = { model, gui, countdownEnd, npcId, index }
+	_slotNPCs = {},         -- [playerName][slotIdx] = { model, planEntry, npcId }
 	_plan = {},              -- [playerName] = { {npcData, slotIdx, countdownEnd, index}, ... }
 	_cycleStartTime = {},    -- [playerName] = tick()
 	_nextPlanIdx = {},       -- [playerName] = 4 (next plan entry to spawn after first 3)
@@ -158,46 +158,23 @@ local NPCTimerService = Knit.CreateService({
 			humanoid.WalkSpeed = 0
 		end
 
-		-- countdown text above the NPC's name
-		local primary = model:FindFirstChild("HumanoidRootPart") or model:FindFirstChildWhichIsA("BasePart") or model.PrimaryPart
-		if primary then
-			local gui = Instance.new("BillboardGui")
-			gui.Name = "CountdownGui"
-			gui.Size = UDim2.new(0, 60, 0, 30)
-			gui.StudsOffset = Vector3.new(0, 5, 0)
-			gui.MaxDistance = 80
-			gui.Parent = primary
+		-- tag the NPC model so client can find it
+		model:SetAttribute("SlotId", slotIdx)
+		model:SetAttribute("OwnerPlayer", player.Name)
 
-			local label = Instance.new("TextLabel")
-			label.Name = "TimerLabel"
-			label.Size = UDim2.new(1, 0, 1, 0)
-			label.BackgroundTransparency = 1
-			label.Text = tostring(planEntry.countdown)
-			label.TextColor3 = Color3.new(1, 1, 1)
-			label.TextStrokeColor3 = Color3.new(0, 0, 0)
-			label.TextStrokeTransparency = 0.3
-			label.TextScaled = true
-			label.Font = Enum.Font.GothamBold
-			label.Parent = gui
+		self._slotNPCs[name][slotIdx] = {
+			model = model,
+			planEntry = planEntry,
+			npcId = npcData.id,
+		}
 
-			self._slotNPCs[name][slotIdx] = {
-				model = model,
-				gui = gui,
-				label = label,
-				planEntry = planEntry,
-				npcId = npcData.id,
-			}
-		end
+		self.Client.OnNPCActivated:Fire(player, slotIdx, npcData.id, planEntry.countdown)
 	end,
 
 	_removeSlotNPC = function(self, player, slotIdx)
 		local name = player.Name
 		local slotData = self._slotNPCs[name] and self._slotNPCs[name][slotIdx]
 		if not slotData then return end
-
-		if slotData.gui then
-			slotData.gui:Destroy()
-		end
 
 		local humanoid = slotData.model:FindFirstChildWhichIsA("Humanoid")
 		if humanoid then
@@ -241,6 +218,9 @@ local NPCTimerService = Knit.CreateService({
 		self:_startKickLoop(player, entry)
 		self:_addToActive(player, entry)
 
+		local pds = Knit.GetService("PlayerDataService")
+		pds:AddUnlockedNPC(player, slotData.npcId)
+
 		self._slotNPCs[name][slotIdx] = nil
 		self.Client.OnTimerExpired:Fire(player, slotIdx, slotData.npcId)
 	end,
@@ -261,11 +241,7 @@ local NPCTimerService = Knit.CreateService({
 			local sd = slotNPCs and slotNPCs[slotIdx]
 			if sd then
 				local remaining = math.max(0, sd.planEntry.countdown - elapsed)
-				sd.label.Text = tostring(remaining)
-
-				if remaining <= 5 then
-					sd.label.TextColor3 = Color3.new(1, 0.2, 0.2)
-				end
+				self.Client.OnTimerUpdated:Fire(player, slotIdx, remaining)
 
 				-- countdown expired
 				if remaining <= 0 then

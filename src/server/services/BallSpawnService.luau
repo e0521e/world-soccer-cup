@@ -122,6 +122,7 @@ local BallSpawnService = Knit.CreateService({
             model = ball,
             mainPart = mainPart,
             inUse = false,
+            claimedByNPC = false,
             spawnTime = tick(),
             dropPos = dropPos,
         }
@@ -159,11 +160,11 @@ local BallSpawnService = Knit.CreateService({
                 break
             end
 
-            if not self._activeBalls[ball] or ballData.inUse then return end
+            if not self._activeBalls[ball] then return end
             task.wait()
         end
 
-        if not self._activeBalls[ball] or ballData.inUse then return end
+        if not self._activeBalls[ball] then return end
 
         ballData.landPos = targetPos
 
@@ -171,7 +172,7 @@ local BallSpawnService = Knit.CreateService({
 
         task.spawn(function()
             local Players = game:GetService("Players")
-            while not ballData.inUse and self._activeBalls[ball] do
+            while self._activeBalls[ball] do
                 for _, player in ipairs(Players:GetPlayers()) do
                     local char = player.Character
                     if char then
@@ -179,8 +180,11 @@ local BallSpawnService = Knit.CreateService({
                         if root then
                             local dist = (root.Position - mainPart.Position).Magnitude
                             if dist < Constants.AUTO_KICK_DISTANCE then
+                                -- skip if player already kicked this ball
+                                if ballData.inUse and not ballData.claimedByNPC then break end
                                 ballData.inUse = true
                                 ballData.inUseTime = tick()
+                                ballData.claimedByNPC = false
                                 self:_PlayerKickBall(player, ball, ballData)
                                 return
                             end
@@ -334,9 +338,15 @@ local BallSpawnService = Knit.CreateService({
         if data and not data.inUse then
             data.inUse = true
             data.inUseTime = tick()
+            data.claimedByNPC = true
             return data
         end
         return nil
+    end,
+
+    IsBallTaken = function(self, ballModel)
+        local data = self._activeBalls[ballModel]
+        return data ~= nil and data.inUse and not data.claimedByNPC
     end,
 
     RemoveBall = function(self, ballModel)

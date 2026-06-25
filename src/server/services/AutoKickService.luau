@@ -46,7 +46,6 @@ local AutoKickService = Knit.CreateService({
         if not nearest then return end
 
         ballSpawn:ClaimBall(nearest.model)
-        slotData.claimedBall = nearest.model
 
         humanoid.WalkSpeed = Constants.NPC_WALK_SPEED
 
@@ -75,6 +74,10 @@ local AutoKickService = Knit.CreateService({
                     humanoid:MoveTo(primary.Position)
                     if runTrack then
                         runTrack:Stop()
+                    end
+                    -- check ball still available (player may have kicked it already)
+                    if ballSpawn:IsBallTaken(nearest.model) then
+                        return
                     end
                     self:_PlayKick(player, npcModel, nearest.model, slotData)
                     return
