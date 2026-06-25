@@ -25,6 +25,19 @@ local Constants = {
     WORLD_CUP_REQUIRED_NPCS = 10,   -- 参加世界杯所需最少 NPC 数量
     HEAD_CAM_FOV = 50,              -- NPC 头像相机视野角度（度）
     USER_ICON_TEMPLATE = "rbxthumb://type=AvatarHeadShot&id=%s&w=60&h=60",  -- 玩家头像 URL 模板
+
+    -- 金币格式化：最多 4 位有效数字，超千加 K/M/B
+    FormatCoins = function(amount: number): string
+        if amount >= 1000000000 then
+            return string.format("%.2fB", amount / 1000000000)
+        elseif amount >= 1000000 then
+            return string.format("%.2fM", amount / 1000000)
+        elseif amount >= 1000 then
+            return string.format("%.2fK", amount / 1000)
+        else
+            return tostring(math.floor(amount))
+        end
+    end,
 }
 
 return Constants

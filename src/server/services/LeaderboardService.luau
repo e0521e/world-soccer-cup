@@ -4,6 +4,7 @@ local DataStoreService = game:GetService("DataStoreService")
 
 local LEADERBOARD_SIZE = 100
 local ORDERED_DS_NAME = "TrophiesRanking"
+local PLAYER_NAMES_KEY = "PlayerDisplayNames"
 
 local LeaderboardService = Knit.CreateService({
 	Name = "LeaderboardService",
@@ -21,19 +22,27 @@ local LeaderboardService = Knit.CreateService({
 	},
 
 	_orderedDs = nil,
+	_nameDs = nil,
 	_cachedTop = {},
 	_cacheTime = 0,
 
 	UpdateRanking = function(self, player)
-		if not self._orderedDs then return end
 		local pds = Knit.GetService("PlayerDataService")
 		local trophies = pds:GetTrophies(player)
-		local ok = pcall(function()
+		print("[Leaderboard] UpdateRanking", player.Name, "trophies", trophies)
+		if not self._orderedDs then
+			warn("[Leaderboard] OrderedDataStore nil, cannot save")
+			return
+		end
+		local ok, err = pcall(function()
 			self._orderedDs:SetAsync(tostring(player.UserId), trophies)
 		end)
 		if ok then
 			self._cacheTime = 0
+			print("[Leaderboard] SetAsync OK for", player.Name, trophies)
 			self.Client.OnLeaderboardUpdated:Fire(player)
+		else
+			warn("[Leaderboard] SetAsync failed:", err)
 		end
 	end,
 
@@ -44,20 +53,45 @@ local LeaderboardService = Knit.CreateService({
 			return self._cachedTop
 		end
 
-		if not self._orderedDs then return {} end
-		local entries = {}
+		if not self._orderedDs then
+			warn("[Leaderboard] GetTopPlayers: OrderedDataStore nil")
+			return {}
+		end
+
 		local ok, pages = pcall(function()
 			return self._orderedDs:GetSortedAsync(false, count)
 		end)
-		if not ok or not pages then return {} end
+		if not ok then
+			warn("[Leaderboard] GetSortedAsync failed:", pages)
+			return {}
+		end
+		if not pages then
+			warn("[Leaderboard] GetSortedAsync returned nil pages")
+			return {}
+		end
 
 		local data = pages:GetCurrentPage()
+		print("[Leaderboard] GetCurrentPage entries:", #data)
+
+		-- load player name mapping from DataStore if available
+		local nameMap = {}
+		if self._nameDs then
+			local ok2, names = pcall(function()
+				return self._nameDs:GetAsync(PLAYER_NAMES_KEY)
+			end)
+			if ok2 and names then
+				nameMap = names
+			end
+		end
+
+		local entries = {}
 		for _, entry in ipairs(data) do
 			local userId = tonumber(entry.key)
 			local playerObj = userId and Players:GetPlayerByUserId(userId)
+			local name = playerObj and playerObj.DisplayName or nameMap[tostring(userId)] or "Offline"
 			table.insert(entries, {
 				userId = userId,
-				name = playerObj and playerObj.DisplayName or "Offline",
+				name = name,
 				trophies = entry.value,
 				rank = #entries + 1,
 			})
@@ -93,10 +127,18 @@ local LeaderboardService = Knit.CreateService({
 			return DataStoreService:GetOrderedDataStore(ORDERED_DS_NAME)
 		end)
 		self._orderedDs = ok and ds or nil
-		if not self._orderedDs then
-			warn("LeaderboardService: OrderedDataStore unavailable")
+
+		local ok2, nds = pcall(function()
+			return DataStoreService:GetDataStore("PlayerNames")
+		end)
+		self._nameDs = ok2 and nds or nil
+
+		if self._orderedDs then
+			print("[Leaderboard] OrderedDataStore ready")
+		else
+			warn("[Leaderboard] OrderedDataStore unavailable")
 		end
-		print("LeaderboardService initialized")
+		print("[Leaderboard] initialized")
 	end,
 
 	KnitStart = function(self)
@@ -104,18 +146,41 @@ local LeaderboardService = Knit.CreateService({
 			task.wait(3)
 			local pds = Knit.GetService("PlayerDataService")
 			local trophies = pds:GetTrophies(player)
+			print("[Leaderboard] PlayerAdded", player.Name, "trophies", trophies)
 			if self._orderedDs then
 				pcall(function()
 					self._orderedDs:SetAsync(tostring(player.UserId), trophies)
 				end)
 			end
+			if self._nameDs then
+				pcall(function()
+					self._nameDs:UpdateAsync(PLAYER_NAMES_KEY, function(old)
+						old = old or {}
+						old[tostring(player.UserId)] = player.DisplayName
+						return old
+					end)
+				end)
+			end
 		end)
 
 		Players.PlayerRemoving:Connect(function(player)
-			self:UpdateRanking(player)
+			local pds = Knit.GetService("PlayerDataService")
+			local trophies = pds:GetTrophies(player)
+			if trophies > 0 then
+				self:UpdateRanking(player)
+			end
+			if self._nameDs then
+				pcall(function()
+					self._nameDs:UpdateAsync(PLAYER_NAMES_KEY, function(old)
+						old = old or {}
+						old[tostring(player.UserId)] = player.DisplayName
+						return old
+					end)
+				end)
+			end
 		end)
 
-		print("LeaderboardService started")
+		print("[Leaderboard] started")
 	end,
 })
 

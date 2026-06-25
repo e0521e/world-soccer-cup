@@ -1,5 +1,6 @@
 local InfoBarView = {}
 InfoBarView.__index = InfoBarView
+local Constants = require(game:GetService("ReplicatedStorage").Shared.constants.Constants)
 
 function InfoBarView.new(screenGui: Instance)
 	local self = setmetatable({}, InfoBarView)
@@ -28,7 +29,7 @@ end
 
 function InfoBarView:UpdateCoins(balance: number)
 	if self._coinLabel then
-		self._coinLabel.Text = tostring(math.floor(balance))
+		self._coinLabel.Text = Constants.FormatCoins(balance)
 	end
 end
 

@@ -314,15 +314,15 @@ local NPCTimerService = Knit.CreateService({
 			self._activeNPCs[name] = active
 		end
 
-		table.insert(active, entry)
-
-		if #active > MAX_ACTIVE_NPCS then
-			local oldest = table.remove(active, 1)
-			oldest.isActive = false
-			if oldest.npcModel then
-				oldest.npcModel:Destroy()
+		if #active >= MAX_ACTIVE_NPCS then
+			entry.isActive = false
+			if entry.npcModel then
+				entry.npcModel:Destroy()
 			end
+			return
 		end
+
+		table.insert(active, entry)
 
 		self:_saveActiveNPCS(player)
 	end,

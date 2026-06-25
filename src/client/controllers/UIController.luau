@@ -3,6 +3,7 @@ local Players = game:GetService("Players")
 local Constants = require(game:GetService("ReplicatedStorage").Shared.constants.Constants)
 local NPCData = require(game:GetService("ReplicatedStorage").Shared.configs.NPCData)
 local AdminData = require(game:GetService("ReplicatedStorage").Shared.configs.AdminData)
+local PlayerLevels = require(game:GetService("ReplicatedStorage").Shared.configs.PlayerLevels)
 local TweenService = game:GetService("TweenService")
 local Workspace = game:GetService("Workspace")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
@@ -363,6 +364,25 @@ local UIController = Knit.CreateController({
 						break
 					end
 				end
+			end
+		end
+
+		-- update level info panel
+		local infoPanel = cardContainer.Parent:FindFirstChild("u_info")
+		if infoPanel then
+			local levelInfo = pds:GetLevel()
+			local config = PlayerLevels[levelInfo.level] or PlayerLevels[1]
+			local tLv = infoPanel:FindFirstChild("t_lv")
+			if tLv and tLv:IsA("TextLabel") then
+				tLv.Text = "Level : " .. tostring(levelInfo.level)
+			end
+			local tMoney = infoPanel:FindFirstChild("t_money")
+			if tMoney and tMoney:IsA("TextLabel") then
+				tMoney.Text = "💵 " .. tostring(levelInfo.multiplier) .. "x"
+			end
+			local tPower = infoPanel:FindFirstChild("t_power")
+			if tPower and tPower:IsA("TextLabel") then
+				tPower.Text = tostring(config.power)
 			end
 		end
 	end,

@@ -123,6 +123,18 @@ local PlayerService = Knit.CreateService({
                         return
                     end
 
+                    if self._worldCupCD and self._worldCupCD[player] and tick() - self._worldCupCD[player] < 600 then
+                        local remaining = 600 - (tick() - self._worldCupCD[player])
+                        local noticeEvent = game:GetService("ReplicatedStorage"):FindFirstChild("UpgradeNoticeEvent")
+                        if noticeEvent then
+                            noticeEvent:FireClient(player, "WorldCupCooldown")
+                        end
+                        return
+                    end
+
+                    self._worldCupCD = self._worldCupCD or {}
+                    self._worldCupCD[player] = tick()
+
                     local noticeEvent = game:GetService("ReplicatedStorage"):FindFirstChild("UpgradeNoticeEvent")
                     if noticeEvent then
                         noticeEvent:FireClient(player, "WorldCupStart")

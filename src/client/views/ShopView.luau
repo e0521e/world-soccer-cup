@@ -260,7 +260,7 @@ end
 function ShopView:UpdateCoinsDisplay()
 	local pds = Knit.GetService("PlayerDataService")
 	local coins = pds:GetCoins()
-	self._coinsLabel.Text = "💵 " .. tostring(math.floor(coins))
+	self._coinsLabel.Text = "💵 " .. Constants.FormatCoins(coins)
 end
 
 function ShopView:SwitchTab(tab: string)

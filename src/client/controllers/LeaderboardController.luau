@@ -45,10 +45,11 @@ local LeaderboardController = Knit.CreateController({
 		local localUserId = Players.LocalPlayer.UserId
 		for i = 1, DISPLAY_COUNT do
 			local entry = entries[i]
-			local rankLabel = rowList:FindFirstChild("Rank_" .. tostring(i))
-			local avatarLabel = rowList:FindFirstChild("Avatar_" .. tostring(i))
-			local nameLabel = rowList:FindFirstChild("Name_" .. tostring(i))
-			local trophyLabel = rowList:FindFirstChild("Trophies_" .. tostring(i))
+			local rowBg = rowList:FindFirstChild("RowBg_" .. tostring(i))
+			local rankLabel = rowBg and rowBg:FindFirstChild("Rank_" .. tostring(i))
+			local avatarLabel = rowBg and rowBg:FindFirstChild("Avatar_" .. tostring(i))
+			local nameLabel = rowBg and rowBg:FindFirstChild("Name_" .. tostring(i))
+			local trophyLabel = rowBg and rowBg:FindFirstChild("Trophies_" .. tostring(i))
 
 			if entry then
 				if rankLabel then
