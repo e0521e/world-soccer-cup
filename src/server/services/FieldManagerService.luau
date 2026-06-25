@@ -199,6 +199,9 @@ local FieldManagerService = Knit.CreateService({
         end
         if #guis == 0 then return end
 
+        local goal = field:FindFirstChild("_door")
+        local goalChk = goal and goal:FindFirstChild("goal_chk")
+
         local userId = player.UserId
         local success, content = pcall(function()
             return game:GetService("Players"):GetUserThumbnailAsync(userId, Enum.ThumbnailType.HeadShot, Enum.ThumbnailSize.Size48x48)
@@ -206,6 +209,10 @@ local FieldManagerService = Knit.CreateService({
         local avatarUrl = success and content or ""
 
         for _, gui in ipairs(guis) do
+            if goalChk then
+                gui.Adornee = goalChk
+                gui.StudsOffset = Vector3.new(0, 16, 0)
+            end
             local avatar = gui:FindFirstChild("Avatar")
             if avatar and avatar:IsA("ImageLabel") then
                 if avatarUrl ~= "" then

@@ -25,6 +25,8 @@ local LeaderboardService = Knit.CreateService({
 	_nameDs = nil,
 	_cachedTop = {},
 	_cacheTime = 0,
+	_broadcastCooldown = 0,
+	_broadcastThread = nil,
 
 	UpdateRanking = function(self, player)
 		local pds = Knit.GetService("PlayerDataService")
@@ -40,7 +42,17 @@ local LeaderboardService = Knit.CreateService({
 		if ok then
 			self._cacheTime = 0
 			print("[Leaderboard] SetAsync OK for", player.Name, trophies)
-			self.Client.OnLeaderboardUpdated:Fire(player)
+			local now = tick()
+			if now - self._broadcastCooldown >= 2 then
+				self._broadcastCooldown = now
+				self.Client.OnLeaderboardUpdated:Fire(player)
+			elseif not self._broadcastThread then
+				self._broadcastThread = task.delay(2 - (now - self._broadcastCooldown), function()
+					self._broadcastThread = nil
+					self._broadcastCooldown = tick()
+					self.Client.OnLeaderboardUpdated:Fire()
+				end)
+			end
 		else
 			warn("[Leaderboard] SetAsync failed:", err)
 		end

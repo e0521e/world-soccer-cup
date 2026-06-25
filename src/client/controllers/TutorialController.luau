@@ -51,7 +51,12 @@ end
 
 local function findNearestBall()
 	local nearest, nearestDist = nil, math.huge
-	for _, child in ipairs(Workspace:GetChildren()) do
+	local ballFolder = Workspace:FindFirstChild("FieldBalls")
+	if not ballFolder then
+		print("[Tutorial] FieldBalls folder not found")
+		return nil
+	end
+	for _, child in ipairs(ballFolder:GetChildren()) do
 		if child.Name:find("FieldBall") then
 			local main = child:FindFirstChild("Main")
 			if main then
