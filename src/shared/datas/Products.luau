@@ -1,6 +1,6 @@
 local Products = {
 	{
-		ProductId = 3528485277,
+		ProductId = 3606607266,
 		Name = "500 Coins",
 		Description = "Add 500 coins to your wallet",
 		PriceRobux = 99,
@@ -9,7 +9,7 @@ local Products = {
 		Icon = "💵",
 	},
 	{
-		ProductId = 3528485301,
+		ProductId = 3606607214,
 		Name = "1500 Coins",
 		Description = "Add 1500 coins to your wallet",
 		PriceRobux = 299,
@@ -18,7 +18,7 @@ local Products = {
 		Icon = "💵",
 	},
 	{
-		ProductId = 3528485307,
+		ProductId = 3606607284,
 		Name = "5000 Coins",
 		Description = "Add 5000 coins to your wallet",
 		PriceRobux = 999,

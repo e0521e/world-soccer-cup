@@ -1,4 +1,5 @@
 local Knit = require(game:GetService("ReplicatedStorage").Packages.Knit)
+local Constants = require(game:GetService("ReplicatedStorage").Shared.constants.Constants)
 local TweenService = game:GetService("TweenService")
 local MarketplaceService = game:GetService("MarketplaceService")
 local Players = game:GetService("Players")

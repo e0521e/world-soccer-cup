@@ -13,9 +13,19 @@ local SoundController = Knit.CreateController({
 
 	_activeSounds = {},
 
-	_Play = function(self, name, parent)
+	_CreateSound = function(self, name)
+		local template = SoundService:FindFirstChild("SoundGroup")
+		if template then
+			local soundTemplate = template:FindFirstChild(name)
+			if soundTemplate and soundTemplate:IsA("Sound") then
+				local sound = soundTemplate:Clone()
+				sound.Name = "SFX_" .. name
+				return sound
+			end
+		end
+
 		local config = SOUND_IDS[name]
-		if not config then return end
+		if not config then return nil end
 
 		local sound = Instance.new("Sound")
 		sound.Name = "SFX_" .. name
@@ -25,6 +35,12 @@ local SoundController = Knit.CreateController({
 		if config.startTime then
 			sound.TimePosition = config.startTime
 		end
+		return sound
+	end,
+
+	_Play = function(self, name, parent)
+		local sound = self:_CreateSound(name)
+		if not sound then return end
 
 		if parent then
 			sound.Parent = parent
