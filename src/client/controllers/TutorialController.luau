@@ -34,8 +34,13 @@ local function findFirstNPC(field)
 		print("[Tutorial] no Slot1 position available")
 		return nil
 	end
-	for _, child in ipairs(Workspace:GetChildren()) do
-		if child:IsA("Model") and child ~= char then
+	local npcFolder = Workspace:FindFirstChild("FieldNPCs")
+	if not npcFolder then
+		print("[Tutorial] FieldNPCs folder not found")
+		return nil
+	end
+	for _, child in ipairs(npcFolder:GetChildren()) do
+		if child:IsA("Model") then
 			local root = child:FindFirstChild("HumanoidRootPart")
 			if root and child:FindFirstChildWhichIsA("Humanoid") then
 				if (root.Position - slotPos).Magnitude < 3 then

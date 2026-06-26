@@ -12,7 +12,7 @@ function ToastView.new(screenGui: Instance)
 
 	self._container = Instance.new("Frame")
 	self._container.Name = "ToastContainer"
-	self._container.Size = UDim2.new(0.2, 0, 0, 0)
+	self._container.Size = UDim2.new(0.4, 0, 0, 0)
 	self._container.Position = UDim2.new(0.5, 0, 0.38, 0)
 	self._container.AnchorPoint = Vector2.new(0.5, 0.5)
 	self._container.BackgroundTransparency = 1

@@ -221,6 +221,9 @@ local NPCTimerService = Knit.CreateService({
 		local pds = Knit.GetService("PlayerDataService")
 		pds:AddUnlockedNPC(player, slotData.npcId)
 
+		slotData.model:SetAttribute("SlotId", nil)
+		slotData.model:SetAttribute("OwnerPlayer", nil)
+
 		self._slotNPCs[name][slotIdx] = nil
 		self.Client.OnTimerExpired:Fire(player, slotIdx, slotData.npcId)
 	end,

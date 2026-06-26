@@ -42,10 +42,6 @@ local UIController = Knit.CreateController({
 			self._nameTagConn:Disconnect()
 			self._nameTagConn = nil
 		end
-		if self._nameTag then
-			self._nameTag:Destroy()
-			self._nameTag = nil
-		end
 
 		local char = Players.LocalPlayer.Character
 		if not char then
@@ -65,15 +61,39 @@ local UIController = Knit.CreateController({
 
 		local levelInfo = self._pds:GetLevel()
 
+		if self._nameTag and self._nameTag.Parent then
+			local nameLabel = self._nameTag:FindFirstChild("NameLabel")
+			if nameLabel then
+				nameLabel.Text = Players.LocalPlayer.DisplayName
+			end
+			local levelLabel = self._nameTag:FindFirstChild("LevelLabel")
+			if levelLabel then
+				levelLabel.Text = "Lv." .. tostring(levelInfo.level)
+			end
+			self._nameTag.Adornee = root
+			self._nameTag.Parent = root
+
+			self._nameTagConn = Players.LocalPlayer.CharacterAdded:Connect(function()
+				self:_UpdateNameTag()
+			end)
+			return
+		end
+
+		if self._nameTag then
+			self._nameTag:Destroy()
+			self._nameTag = nil
+		end
+
 		local gui = Instance.new("BillboardGui")
 		gui.Name = "PlayerNameTag"
-		gui.Size = UDim2.new(0, 160, 0, 40)
+		gui.Size = UDim2.new(0, 160, 0, 44)
 		gui.StudsOffset = Vector3.new(0, 3.5, 0)
 		gui.AlwaysOnTop = true
 		gui.Adornee = root
 		gui.Parent = root
 
 		local nameLabel = Instance.new("TextLabel")
+		nameLabel.Name = "NameLabel"
 		nameLabel.Size = UDim2.new(1, 0, 0, 22)
 		nameLabel.Position = UDim2.new(0, 0, 0, 0)
 		nameLabel.BackgroundTransparency = 1
@@ -87,7 +107,8 @@ local UIController = Knit.CreateController({
 		nameLabel.Parent = gui
 
 		local levelLabel = Instance.new("TextLabel")
-		levelLabel.Size = UDim2.new(1, 0, 0, 16)
+		levelLabel.Name = "LevelLabel"
+		levelLabel.Size = UDim2.new(1, 0, 0, 20)
 		levelLabel.Position = UDim2.new(0, 0, 0, 22)
 		levelLabel.BackgroundTransparency = 1
 		levelLabel.Text = "Lv." .. tostring(levelInfo.level)

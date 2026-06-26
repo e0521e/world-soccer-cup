@@ -48,7 +48,7 @@ local BallSpawnService = Knit.CreateService({
                         current += 1
                     end
                     local gap = cap - current
-                    local interval = math.max(1, Constants.BALL_SPAWN_INTERVAL - math.floor(gap / 2))
+                    local interval = math.max(0.5, Constants.BALL_SPAWN_INTERVAL - math.floor(gap / 2))
                     task.wait(interval)
                 else
                     task.wait(Constants.BALL_SPAWN_INTERVAL)
@@ -144,7 +144,7 @@ local BallSpawnService = Knit.CreateService({
 
         local startPos = ball:GetPivot()
         local targetPos = Vector3.new(mainPart.Position.X, Constants.BALL_LAND_Y, mainPart.Position.Z)
-        local dropDuration = 1.5
+        local dropDuration = Constants.BALL_DROP_DURATION
         local startTime = tick()
 
         while true do
