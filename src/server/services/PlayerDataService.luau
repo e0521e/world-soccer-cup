@@ -69,6 +69,7 @@ local PlayerDataService = Knit.CreateService({
 				if data.BallIds == nil then data.BallIds = { "1" } end
 				if data.FirstJoinTime == nil then data.FirstJoinTime = DateTime.now().UnixTimestampMillis end
 				if data.ActiveNPCS == nil then data.ActiveNPCS = {} end
+				if data.LastWorldCupTime == nil then data.LastWorldCupTime = 0 end
 				self._playerData[player] = data
 				loaded = true
 			end
@@ -85,6 +86,7 @@ local PlayerDataService = Knit.CreateService({
 				New = true,
 				FirstJoinTime = DateTime.now().UnixTimestampMillis,
 				ActiveNPCS = {},
+				LastWorldCupTime = 0,
 			}
 			print("[PlayerDataService] new player", player.Name)
 		else

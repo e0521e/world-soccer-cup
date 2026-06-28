@@ -123,17 +123,14 @@ local PlayerService = Knit.CreateService({
                         return
                     end
 
-                    if self._worldCupCD and self._worldCupCD[player] and tick() - self._worldCupCD[player] < 600 then
-                        local remaining = 600 - (tick() - self._worldCupCD[player])
+                    local lastTime = pds:GetData(player) and pds:GetData(player).LastWorldCupTime or 0
+                    if lastTime > 0 and os.time() - lastTime < 600 then
                         local noticeEvent = game:GetService("ReplicatedStorage"):FindFirstChild("UpgradeNoticeEvent")
                         if noticeEvent then
                             noticeEvent:FireClient(player, "WorldCupCooldown")
                         end
                         return
                     end
-
-                    self._worldCupCD = self._worldCupCD or {}
-                    self._worldCupCD[player] = tick()
 
                     local noticeEvent = game:GetService("ReplicatedStorage"):FindFirstChild("UpgradeNoticeEvent")
                     if noticeEvent then
@@ -164,6 +161,8 @@ local PlayerService = Knit.CreateService({
                     end
 
 					pds:AddTrophies(player, 1)
+					local data = pds:GetData(player)
+					if data then data.LastWorldCupTime = os.time() end
 					pds:SavePlayerData(player)
 					local leaderboard = Knit.GetService("LeaderboardService")
 					leaderboard:UpdateRanking(player)
